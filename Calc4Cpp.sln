@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27617.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Calc4Cpp", "Calc4Cpp\Calc4Cpp.vcxproj", "{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Debug|x64.ActiveCfg = Debug|x64
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Debug|x64.Build.0 = Debug|x64
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Debug|x86.ActiveCfg = Debug|Win32
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Debug|x86.Build.0 = Debug|Win32
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Release|x64.ActiveCfg = Release|x64
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Release|x64.Build.0 = Release|x64
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Release|x86.ActiveCfg = Release|Win32
+		{0E3A081E-7C7E-459A-88A0-EDC71698DAEF}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {52280210-4D6F-4DF0-ABF7-D3CC5C40C058}
+	EndGlobalSection
+EndGlobal
