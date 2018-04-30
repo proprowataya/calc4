@@ -7,14 +7,6 @@
 #include <stack>
 #include "Common.h"
 
-#define MAKE_ACCEPT virtual void Accept(OperatorVisitor<TNumber> &visitor) const override {\
-	visitor.Visit(*this);\
-}
-
-#define MAKE_GET_OPERANDS(...) virtual std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const override {\
-	return std::vector<std::shared_ptr<Operator<TNumber>>>({ __VA_ARGS__ });\
-}
-
 #define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE *>(alloca(sizeof(TYPE) * (LENGTH)))
 
 template<typename TNumber>
@@ -94,6 +86,14 @@ public:
 	virtual void Accept(OperatorVisitor<TNumber> &visitor) const = 0;
 	virtual std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const = 0;
 };
+
+#define MAKE_ACCEPT virtual void Accept(OperatorVisitor<TNumber> &visitor) const override {\
+	visitor.Visit(*this);\
+}
+
+#define MAKE_GET_OPERANDS(...) virtual std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const override {\
+	return std::vector<std::shared_ptr<Operator<TNumber>>>({ __VA_ARGS__ });\
+}
 
 template<typename TNumber>
 class ZeroOperator : public Operator<TNumber> {

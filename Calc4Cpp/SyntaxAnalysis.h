@@ -9,50 +9,157 @@
 #include "Common.h"
 #include "Operators.h"
 
-enum class TokenType {
-	Argument,
-	Define,
-	Parenthesis,
-	Decimal,
-	BinaryOperator,
-	ConditionalOperator,
-	UserDefinedOperator,
+/* ********** */
+
+class Token {
+public:
+	virtual int GetNumOperands() const = 0;
+	virtual const std::string &GetSupplementaryText() const = 0;
 };
 
-struct Token {
-	TokenType type;
-	std::string supplementaryText;
-
-	std::string name;					// For Argument, Define, UserDefinedOperator
-	int index;							// For Argument
-	std::vector<std::string> arguments;	// For Define
-	std::vector<Token> tokens;			// For Define, Parenthesis
-	int value;							// For Decimal
-	BinaryType binaryType;				// For BinaryOperator
-	int numOperands;					// For UserDefinedOperator
-};
-
-int GetNumOperands(const Token &token) {
-	switch (token.type) {
-	case TokenType::Argument:
-	case TokenType::Define:
-	case TokenType::Parenthesis:
-		return 0;
-	case TokenType::Decimal:
-		return 1;
-	case TokenType::BinaryOperator:
-		return 2;
-	case TokenType::ConditionalOperator:
-		return 3;
-	case TokenType::UserDefinedOperator:
-		return token.numOperands;
-	default:
-		return -1;
-	}
+#define MAKE_GET_SUPPLEMENTARY_TEXT virtual const std::string &GetSupplementaryText() const override {\
+	return supplementaryText;\
 }
 
+#define MAKE_GET_NUM_OPERANDS(NUM_OPERANDS) virtual int GetNumOperands() const override {\
+	return NUM_OPERANDS;\
+}
+
+class ArgumentToken : public Token {
+private:
+	std::string name;
+	int index;
+	std::string supplementaryText;
+
+public:
+	ArgumentToken(const std::string &name, int index, const std::string &supplementaryText)
+		: name(name), index(index), supplementaryText(supplementaryText) {}
+
+	const std::string GetName() const {
+		return name;
+	}
+
+	int GetIndex() const {
+		return index;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(0)
+};
+
+class DefineToken : public Token {
+private:
+	std::string name;
+	std::vector<std::string> arguments;
+	std::vector<std::shared_ptr<Token>> tokens;
+	std::string supplementaryText;
+
+public:
+	DefineToken(
+		const std::string &name,
+		const std::vector<std::string> &arguments,
+		const std::vector<std::shared_ptr<Token>> &tokens,
+		const std::string &supplementaryText)
+		: name(name), arguments(arguments), tokens(tokens), supplementaryText(supplementaryText) {}
+
+	const std::string GetName() const {
+		return name;
+	}
+
+	const std::vector<std::string> GetArguments() const {
+		return arguments;
+	}
+
+	const std::vector<std::shared_ptr<Token>> GetTokens() const {
+		return tokens;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(0)
+};
+
+class ParenthesisToken : public Token {
+private:
+	std::vector<std::shared_ptr<Token>> tokens;
+	std::string supplementaryText;
+
+public:
+	ParenthesisToken(const std::vector<std::shared_ptr<Token>> &tokens, const std::string &supplementaryText)
+		: tokens(tokens), supplementaryText(supplementaryText) {}
+
+	const std::vector<std::shared_ptr<Token>> GetTokens() const {
+		return tokens;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(0)
+};
+
+class DecimalToken : public Token {
+private:
+	int value;
+	std::string supplementaryText;
+
+public:
+	DecimalToken(int value, const std::string &supplementaryText)
+		: value(value), supplementaryText(supplementaryText) {}
+
+	int GetValue() const {
+		return value;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(1)
+};
+
+class BinaryOperatorToken : public Token {
+private:
+	BinaryType type;
+	std::string supplementaryText;
+
+public:
+	BinaryOperatorToken(BinaryType type, const std::string &supplementaryText)
+		: type(type), supplementaryText(supplementaryText) {}
+
+	BinaryType GetType() const {
+		return type;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(2)
+};
+
+class ConditionalOperatorToken : public Token {
+private:
+	std::string supplementaryText;
+
+public:
+	ConditionalOperatorToken(const std::string &supplementaryText)
+		: supplementaryText(supplementaryText) {}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS(3)
+};
+
+class UserDefinedOperatorToken : public Token {
+private:
+	OperatorDefinition definition;
+	std::string supplementaryText;
+
+public:
+	UserDefinedOperatorToken(const OperatorDefinition &definition, const std::string &supplementaryText)
+		: definition(definition), supplementaryText(supplementaryText) {}
+
+	const OperatorDefinition &GetDefinition() const {
+		return definition;
+	}
+
+	MAKE_GET_SUPPLEMENTARY_TEXT;
+	MAKE_GET_NUM_OPERANDS((definition.GetNumOperands()))
+};
+
 template<typename TNumber>
-std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &context) {
+std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationContext<TNumber> &context) {
 	class Implement {
 	private:
 		const std::string &text;
@@ -66,8 +173,8 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 		Implement(const std::string &text, CompilationContext<TNumber> &context, const std::vector<std::string> &arguments)
 			: text(text), context(context), index(0), arguments(arguments) {}
 
-		std::vector<Token> Lex() {
-			std::vector<Token> vec;
+		std::vector<std::shared_ptr<Token>> Lex() {
+			std::vector<std::shared_ptr<Token>> vec;
 
 			while (index < text.length() && text[index] != ')') {
 				if (text[index] == ' ') {
@@ -81,7 +188,7 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 			return vec;
 		}
 
-		Token NextToken() {
+		std::shared_ptr<Token> NextToken() {
 			switch (text[index]) {
 			case 'D':
 				return LexDefineToken();
@@ -105,19 +212,21 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 			}
 		}
 
-		Token LexDefineToken() {
+		std::shared_ptr<DefineToken> LexDefineToken() {
 			assert(text[index] == 'D');
 			index++;
 
 			std::string supplementaryText = LexSupplementaryText();
 			std::string splitted[3];
 
+			// Split supplementaryText into three strings
 			for (size_t i = 0, begin = 0; i < 3; i++) {
 				size_t end = supplementaryText.find_first_of('|', begin);
 				splitted[i] = supplementaryText.substr(begin, end - begin);
 				begin = end + 1;
 			}
 
+			// Split arguments
 			std::vector<std::string> arguments;
 			for (size_t begin = 0; begin < splitted[1].length();) {
 				size_t end = splitted[1].find_first_of(',', begin);
@@ -130,27 +239,23 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 				}
 			}
 
-			OperatorDefinition definition(splitted[0], static_cast<int>(arguments.size()));
+			auto &name = splitted[0];
+
+			// Update CompilationContext
+			OperatorDefinition definition(name, static_cast<int>(arguments.size()));
 			OperatorImplement<TNumber> implement(definition, nullptr);
 			context.AddOperatorImplement(implement);
 
 			auto tokens = Implement(splitted[2], context, arguments).Lex();
-			Token token = { TokenType::Define };
-			token.name = splitted[0];
-			token.arguments = arguments;
-			token.tokens = std::move(tokens);
-			token.supplementaryText = supplementaryText;
-			return token;
+			return std::make_shared<DefineToken>(name, arguments, tokens, LexSupplementaryText());
 		}
 
-		Token LexDecimalToken() {
-			Token token = { TokenType::Decimal };
-			token.value = text[index++] - '0';
-			token.supplementaryText = LexSupplementaryText();
-			return token;
+		std::shared_ptr<DecimalToken> LexDecimalToken() {
+			int value = text[index++] - '0';
+			return std::make_shared<DecimalToken>(value, LexSupplementaryText());
 		}
 
-		Token LexUserDefinedOperatorOrArgumentToken() {
+		std::shared_ptr<Token> LexUserDefinedOperatorOrArgumentToken() {
 			assert(text[index] == '{');
 			index++;
 
@@ -162,26 +267,19 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 			index = end + 1;
 
 			if (auto implement = context.TryGetOperatorImplement(name)) {
-				Token token = { TokenType::UserDefinedOperator };
-				token.name = implement->GetDefinition().GetName();
-				token.numOperands = implement->GetDefinition().GetNumOperands();
-				token.supplementaryText = LexSupplementaryText();
-				return token;
+				return std::make_shared<UserDefinedOperatorToken>(implement->GetDefinition(), LexSupplementaryText());
 			} else {
 				auto it = std::find(arguments.begin(), arguments.end(), name);
 				if (it != arguments.end()) {
-					Token token = { TokenType::Argument };
-					token.name = name;
-					token.index = static_cast<int>(std::distance(arguments.begin(), it));
-					token.supplementaryText = LexSupplementaryText();
-					return token;
+					int index = static_cast<int>(std::distance(arguments.begin(), it));
+					return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
 				} else {
 					throw "Error";
 				}
 			}
 		}
 
-		Token LexParenthesisToken() {
+		std::shared_ptr<ParenthesisToken> LexParenthesisToken() {
 			assert(text[index] == '(');
 			index++;
 
@@ -193,126 +291,67 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 			assert(text[index] == ')');
 			index++;
 
-			Token token = { TokenType::Parenthesis };
-			token.tokens = tokens;
-			token.supplementaryText = LexSupplementaryText();
-			return token;
+			return std::make_shared<ParenthesisToken>(tokens, LexSupplementaryText());
 		}
 
-		Token LexSymbolOrArgumentToken() {
+		std::shared_ptr<Token> LexSymbolOrArgumentToken() {
 			if (index + 1 < text.length()) {
 				std::string substr = text.substr(index, 2);
 				if (substr == "==") {
 					index += 2;
-					Token token = { TokenType::BinaryOperator };
-					token.binaryType = BinaryType::Equal;
-					token.supplementaryText = LexSupplementaryText();
-					return token;
+					return std::make_shared<BinaryOperatorToken>(BinaryType::Equal, LexSupplementaryText());
 				} else if (substr == "!=") {
 					index += 2;
-					Token token = { TokenType::BinaryOperator };
-					token.binaryType = BinaryType::NotEqual;
-					token.supplementaryText = LexSupplementaryText();
-					return token;
+					return std::make_shared<BinaryOperatorToken>(BinaryType::NotEqual, LexSupplementaryText());
 				} else if (substr == ">=") {
 					index += 2;
-					Token token = { TokenType::BinaryOperator };
-					token.binaryType = BinaryType::GreaterThanOrEqual;
-					token.supplementaryText = LexSupplementaryText();
-					return token;
+					return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThanOrEqual, LexSupplementaryText());
 				} else if (substr == "<=") {
 					index += 2;
-					Token token = { TokenType::BinaryOperator };
-					token.binaryType = BinaryType::LessThanOrEqual;
-					token.supplementaryText = LexSupplementaryText();
-					return token;
+					return std::make_shared<BinaryOperatorToken>(BinaryType::LessThanOrEqual, LexSupplementaryText());
 				}
 			}
 
 			switch (text[index]) {
 			case '+':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::Add;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::Add, LexSupplementaryText());
 			case '-':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::Sub;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::Sub, LexSupplementaryText());
 			case '*':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::Mult;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::Mult, LexSupplementaryText());
 			case '/':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::Div;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::Div, LexSupplementaryText());
 			case '%':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::Mod;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::Mod, LexSupplementaryText());
 			case '<':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::LessThan;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::LessThan, LexSupplementaryText());
 			case '>':
-			{
 				index++;
-				Token token = { TokenType::BinaryOperator };
-				token.binaryType = BinaryType::GreaterThan;
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThan, LexSupplementaryText());
 			case '?':
-			{
 				index++;
-				Token token = { TokenType::ConditionalOperator };
-				token.supplementaryText = LexSupplementaryText();
-				return token;
-			}
+				return std::make_shared<ConditionalOperatorToken>(LexSupplementaryText());
 			default:
 				break;
 			}
 
-			if (auto implement = context.TryGetOperatorImplement(text.substr(index, 1))) {
-				Token token = { TokenType::UserDefinedOperator };
-				token.name = implement->GetDefinition().GetName();
-				token.numOperands = implement->GetDefinition().GetNumOperands();
-				token.supplementaryText = LexSupplementaryText();
+			std::string name = text.substr(index, 1);
+
+			if (auto implement = context.TryGetOperatorImplement(name)) {
 				index++;
-				return token;
+				return std::make_shared<UserDefinedOperatorToken>(implement->GetDefinition(), LexSupplementaryText());
 			} else {
-				auto it = std::find(arguments.begin(), arguments.end(), text.substr(index, 1));
+				index++;
+				auto it = std::find(arguments.begin(), arguments.end(), name);
 				if (it != arguments.end()) {
-					Token token = { TokenType::Argument };
-					token.name = text.substr(index, 1);
-					token.index = static_cast<int>(std::distance(arguments.begin(), it));
-					token.supplementaryText = LexSupplementaryText();
-					index++;
-					return token;
+					int index = static_cast<int>(std::distance(arguments.begin(), it));
+					return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
 				} else {
 					throw "Error";
 				}
@@ -337,21 +376,21 @@ std::vector<Token> Lex(const std::string &text, CompilationContext<TNumber> &con
 }
 
 template<typename TNumber>
-std::shared_ptr<Operator<TNumber>> Parse(const std::vector<Token> &tokens, CompilationContext<TNumber> &context) {
+std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token>> &tokens, CompilationContext<TNumber> &context) {
 	class Implement {
 	private:
-		const std::vector<Token> &tokens;
+		const std::vector<std::shared_ptr<Token>> &tokens;
 		CompilationContext<TNumber> &context;
 		int maxNumOperands;
 		size_t index;
 
 	public:
-		Implement(const std::vector<Token> &tokens, CompilationContext<TNumber> &context)
+		Implement(const std::vector<std::shared_ptr<Token>> &tokens, CompilationContext<TNumber> &context)
 			: tokens(tokens), context(context), index(0) {
-			auto max = std::max_element(tokens.begin(), tokens.end(), [](const Token &a, const Token &b) {
-				return GetNumOperands(a) < GetNumOperands(b);
+			auto maxElement = std::max_element(tokens.begin(), tokens.end(), [](const std::shared_ptr<Token> &a, const std::shared_ptr<Token> &b) {
+				return a->GetNumOperands() < b->GetNumOperands();
 			});
-			maxNumOperands = GetNumOperands(*max);
+			maxNumOperands = (*maxElement)->GetNumOperands();
 		}
 
 		std::shared_ptr<Operator<TNumber>> Parse() {
@@ -367,7 +406,8 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<Token> &tokens, Compi
 				std::vector<std::shared_ptr<Operator<TNumber>>> operands;
 
 				auto lower = ReadLower();
-				if (lower.empty() && !tokens.empty() && tokens.begin()->type == TokenType::Decimal) {
+				if (lower.empty() && !tokens.empty()
+					&& dynamic_cast<const DecimalToken *>(tokens.begin()->get()) != nullptr) {
 					operands.push_back(std::make_shared<ZeroOperator<TNumber>>());
 				} else {
 					operands.push_back(Implement(lower, context).Parse());
@@ -404,39 +444,40 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<Token> &tokens, Compi
 
 		void GenerateUserDefinedCode() {
 			for (auto& token : tokens) {
-				if (token.type == TokenType::Define) {
-					auto op = Implement(token.tokens, context).Parse();
-					OperatorImplement<TNumber> implement(context.GetOperatorImplement(token.name).GetDefinition(), op);
+				if (auto define = dynamic_cast<const DefineToken *>(token.get())) {
+					auto op = Implement(define->GetTokens(), context).Parse();
+					OperatorImplement<TNumber> implement(context.GetOperatorImplement(define->GetName()).GetDefinition(), op);
 					context.AddOperatorImplement(implement);
 				}
 			}
 		}
 
-		std::shared_ptr<Operator<TNumber>> CreateOperator(const Token &token, const std::vector<std::shared_ptr<Operator<TNumber>>> &operands) {
-			switch (token.type) {
-			case TokenType::Argument:
-				return std::make_shared<ArgumentOperator<TNumber>>(token.index);
-			case TokenType::Define:
+		std::shared_ptr<Operator<TNumber>> CreateOperator(const std::shared_ptr<Token> &token, const std::vector<std::shared_ptr<Operator<TNumber>>> &operands) {
+			auto ptr = token.get();
+
+			if (auto argument = dynamic_cast<const ArgumentToken *>(ptr)) {
+				return std::make_shared<ArgumentOperator<TNumber>>(argument->GetIndex());
+			} else if (auto define = dynamic_cast<const DefineToken *>(ptr)) {
 				return std::make_shared<DefineOperator<TNumber>>();
-			case TokenType::Parenthesis:
-				return Implement(token.tokens, context).Parse();
-			case TokenType::Decimal:
-				return std::make_shared<DecimalOperator<TNumber>>(operands[0], token.value);
-			case TokenType::BinaryOperator:
-				return std::make_shared<BinaryOperator<TNumber>>(operands[0], operands[1], token.binaryType);
-			case TokenType::ConditionalOperator:
+			} else if (auto parentesis = dynamic_cast<const ParenthesisToken *>(ptr)) {
+				return Implement(parentesis->GetTokens(), context).Parse();
+			} else if (auto decimal = dynamic_cast<const DecimalToken *>(ptr)) {
+				return std::make_shared<DecimalOperator<TNumber>>(operands[0], decimal->GetValue());
+			} else if (auto binary = dynamic_cast<const BinaryOperatorToken *>(ptr)) {
+				return std::make_shared<BinaryOperator<TNumber>>(operands[0], operands[1], binary->GetType());
+			} else if (auto conditional = dynamic_cast<const ConditionalOperatorToken *>(ptr)) {
 				return std::make_shared<ConditionalOperator<TNumber>>(operands[0], operands[1], operands[2]);
-			case TokenType::UserDefinedOperator:
-				return std::make_shared<UserDefinedOperator<TNumber>>(OperatorDefinition(token.name, token.numOperands), operands);
-			default:
+			} else if (auto userDefined = dynamic_cast<const UserDefinedOperatorToken *>(ptr)) {
+				return std::make_shared<UserDefinedOperator<TNumber>>(userDefined->GetDefinition(), operands);
+			} else {
 				throw "Invalid";
 			}
 		}
 
-		std::vector<Token> ReadLower() {
-			std::vector<Token> vec;
+		std::vector<std::shared_ptr<Token>> ReadLower() {
+			std::vector<std::shared_ptr<Token>> vec;
 
-			while (index < tokens.size() && GetNumOperands(tokens[index]) < maxNumOperands) {
+			while (index < tokens.size() && tokens[index]->GetNumOperands() < maxNumOperands) {
 				vec.push_back(tokens[index]);
 				index++;
 			}
