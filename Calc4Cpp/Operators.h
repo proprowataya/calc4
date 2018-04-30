@@ -61,7 +61,10 @@ private:
 
 public:
     void AddOperatorImplement(const OperatorImplement<TNumber> &implement) {
-        userDefinedOperators.insert_or_assign(implement.GetDefinition().GetName(), implement);
+        auto p = userDefinedOperators.insert(std::make_pair(implement.GetDefinition().GetName(), implement));
+        if (!p.second) {
+            p.first->second = implement;
+        }
     }
 
     const OperatorImplement<TNumber> &GetOperatorImplement(const std::string &name) const {
