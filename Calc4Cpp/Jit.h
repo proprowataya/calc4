@@ -140,6 +140,7 @@ public:
     }
 
     virtual void Visit(const ConditionalOperator<TNumber> &op) override {
+        llvm::Value *temp = builder->CreateAlloca(builder->getIntNTy(IntegerBits));
         op.GetCondition()->Accept(*this);
         auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits, 0)), builder->getInt1(1), builder->getInt1(0));
         auto oldBuilder = builder;
@@ -149,25 +150,22 @@ public:
         IRGenerator<TNumber> ifTrueGenerator(context, &ifTrueBuilder, function, functionMap);
         op.GetIfTrue()->Accept(ifTrueGenerator);
         builder = ifTrueGenerator.builder;
-        auto ifTrueValue = ifTrueGenerator.value;
+        builder->CreateStore(ifTrueGenerator.value, temp);
 
         llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*context, "", function);
         llvm::IRBuilder<> ifFalseBuilder(ifFalse);
         IRGenerator<TNumber> ifFalseGenerator(context, &ifFalseBuilder, function, functionMap);
         op.GetIfFalse()->Accept(ifFalseGenerator);
         builder = ifFalseGenerator.builder;
-        auto ifFalseValue = ifFalseGenerator.value;
+        builder->CreateStore(ifFalseGenerator.value, temp);
 
         llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*context, "", function);
         builder = new llvm::IRBuilder<>(nextBlock);
-        llvm::PHINode *phiNode = builder->CreatePHI(builder->getIntNTy(IntegerBits), 2);
-        phiNode->addIncoming(ifTrueValue, ifTrue);
-        phiNode->addIncoming(ifFalseValue, ifFalse);
 
         oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
         ifTrueGenerator.builder->CreateBr(nextBlock);
         ifFalseGenerator.builder->CreateBr(nextBlock);
-        value = phiNode;
+        value = builder->CreateLoad(temp);
     }
 
     virtual void Visit(const UserDefinedOperator<TNumber> &op) override {
