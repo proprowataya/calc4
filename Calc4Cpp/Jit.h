@@ -63,7 +63,7 @@ public:
 
     virtual void Visit(const ParenthesisOperator<TNumber> &op) override {
         value = builder->getIntN(IntegerBits, 0);
-        for (auto& item : op.GetOperands()) {
+        for (auto& item : op.GetOperators()) {
             item->Accept(*this);
         }
     }
