@@ -18,6 +18,11 @@ void PrintTree(const Operator<TNumber> &op, int depth) {
 
 int main() {
     using namespace std;
+    using namespace llvm;
+
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
 
     while (true) {
         string line;
@@ -44,32 +49,5 @@ int main() {
             << endl;
     }
 
-#if false
-    auto zero = make_shared<ZeroOperator<int>>();
-    auto three = make_shared<DecimalOperator<int>>(zero, 3);
-    auto four = make_shared<DecimalOperator<int>>(zero, 4);
-    auto add = make_shared<BinaryOperator<int>>(three, four, BinaryType::Add);
-    auto cond = make_shared<ConditionalOperator<int>>(four, three, add);
-    auto body = make_shared<BinaryOperator<int>>(make_shared<ArgumentOperator<int>>(0), make_shared<ArgumentOperator<int>>(1), BinaryType::Mult);
-
-    CompilationContext<int> context;
-    OperatorDefinition def("Add", 2);
-    OperatorImplement<int> impl(def, body);
-    context.AddOperatorImplement(impl);
-
-    auto call = make_shared<UserDefinedOperator<int>>(def, std::vector<std::shared_ptr<Operator<int>>>({ three, four }));
-
-    PrintTree(*cond, 0);
-    cout << endl;
-
-    Evaluator<int> eval(&context);
-    eval.Visit(*call);
-    cout << eval.value << endl;
-
-    auto tokens = Lex("D[add|x,y|x+y] + (1 + 2)", context);
-    auto op = Parse(tokens, context);
-    PrintTree(*op, 0);
-    op->Visit(eval);
-    cout << eval.value << endl;
-#endif
+    llvm_shutdown();
 }

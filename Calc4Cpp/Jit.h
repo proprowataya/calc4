@@ -219,11 +219,6 @@ void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Op
 template<typename TNumber>
 TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<Operator<TNumber>> &op) {
     using namespace llvm;
-
-    LLVMInitializeNativeTarget();
-    LLVMInitializeNativeAsmPrinter();
-    LLVMInitializeNativeAsmParser();
-
     LLVMContext Context;
 
     // Create some module to put our function into it.
@@ -281,6 +276,5 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     TNumber result = func();
 
     delete EE;
-    llvm_shutdown();
     return result;
 }
