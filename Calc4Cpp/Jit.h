@@ -229,7 +229,7 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     GenerateIR(context, op, &Context, M);
 
     // PrintIR
-    outs() << "Before optimized:\n\n" << *M << "\n";
+    outs() << "Before optimized:\n---------------------------\n" << *M << "\n";
     outs().flush();
 
     // Optimize
@@ -261,7 +261,7 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
 #endif
 
     // PrintIR
-    outs() << "After optimized:\n\n" << *M << "\n";
+    outs() << "After optimized:\n---------------------------\n" << *M << "\n";
     outs().flush();
 
     // JIT
@@ -269,7 +269,7 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     std::string error = "No error";
     ebuilder.setErrorStr(&error).setEngineKind(EngineKind::Kind::JIT);
     ExecutionEngine *EE = ebuilder.create();
-    outs() << "Error: " << error << "\n";
+    outs() << "---------------------------\nError: " << error << "\n";
 
     // Call
     auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
