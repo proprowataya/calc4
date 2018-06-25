@@ -141,30 +141,32 @@ public:
 
     virtual void Visit(const ConditionalOperator<TNumber> &op) override {
         op.GetCondition()->Accept(*this);
-        auto cond = value;
+        auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits, 0)), builder->getInt1(1), builder->getInt1(0));
+        auto oldBuilder = builder;
 
         llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*context, "", function);
-        llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*context, "", function);
-        llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*context, "", function);
-        builder->CreateCondBr(cond, ifTrue, ifFalse);
-
         llvm::IRBuilder<> ifTrueBuilder(ifTrue);
         IRGenerator<TNumber> ifTrueGenerator(context, &ifTrueBuilder, function, functionMap);
         op.GetIfTrue()->Accept(ifTrueGenerator);
+        builder = ifTrueGenerator.builder;
         auto ifTrueValue = ifTrueGenerator.value;
-        ifTrueBuilder.CreateBr(nextBlock);
 
+        llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*context, "", function);
         llvm::IRBuilder<> ifFalseBuilder(ifFalse);
         IRGenerator<TNumber> ifFalseGenerator(context, &ifFalseBuilder, function, functionMap);
         op.GetIfFalse()->Accept(ifFalseGenerator);
+        builder = ifFalseGenerator.builder;
         auto ifFalseValue = ifFalseGenerator.value;
-        ifFalseBuilder.CreateBr(nextBlock);
 
+        llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*context, "", function);
         builder = new llvm::IRBuilder<>(nextBlock);
         llvm::PHINode *phiNode = builder->CreatePHI(builder->getIntNTy(IntegerBits), 2);
         phiNode->addIncoming(ifTrueValue, ifTrue);
         phiNode->addIncoming(ifFalseValue, ifFalse);
 
+        oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
+        ifTrueGenerator.builder->CreateBr(nextBlock);
+        ifFalseGenerator.builder->CreateBr(nextBlock);
         value = phiNode;
     }
 
