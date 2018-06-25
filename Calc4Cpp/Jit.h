@@ -33,16 +33,15 @@ constexpr const char *MainFunctionName = "__Main__";
 
 template<typename TNumber>
 class IRGenerator : public OperatorVisitor<TNumber> {
-private:
+public:
+    static constexpr size_t IntegerBits = sizeof(TNumber) * 8;
+
     llvm::LLVMContext *context;
     llvm::IRBuilder<> *builder;
     llvm::Function *function;
     std::unordered_map<std::string, llvm::Function *> functionMap;
-    static constexpr size_t IntegerBits = sizeof(TNumber) * 8;
-
-public:
     llvm::Value *value;
-    
+
     IRGenerator(llvm::LLVMContext *context, llvm::IRBuilder<> *builder, llvm::Function *function, const std::unordered_map<std::string, llvm::Function *> &functionMap)
         : context(context), builder(builder), function(function), functionMap(functionMap) {}
 
@@ -147,18 +146,19 @@ public:
         llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*context, "", function);
         llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*context, "", function);
         llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*context, "", function);
+        builder->CreateCondBr(cond, ifTrue, ifFalse);
 
         llvm::IRBuilder<> ifTrueBuilder(ifTrue);
         IRGenerator<TNumber> ifTrueGenerator(context, &ifTrueBuilder, function, functionMap);
         op.GetIfTrue()->Accept(ifTrueGenerator);
-        ifTrueBuilder.CreateBr(nextBlock);
         auto ifTrueValue = ifTrueGenerator.value;
+        ifTrueBuilder.CreateBr(nextBlock);
 
         llvm::IRBuilder<> ifFalseBuilder(ifFalse);
         IRGenerator<TNumber> ifFalseGenerator(context, &ifFalseBuilder, function, functionMap);
         op.GetIfFalse()->Accept(ifFalseGenerator);
-        ifFalseBuilder.CreateBr(nextBlock);
         auto ifFalseValue = ifFalseGenerator.value;
+        ifFalseBuilder.CreateBr(nextBlock);
 
         builder = new llvm::IRBuilder<>(nextBlock);
         llvm::PHINode *phiNode = builder->CreatePHI(builder->getIntNTy(IntegerBits), 2);
@@ -176,7 +176,7 @@ public:
             arguments[i] = value;
         }
 
-        value = builder->CreateCall(functionMap[op.GetDefinition().GetName()]);
+        value = builder->CreateCall(functionMap[op.GetDefinition().GetName()], arguments);
     }
 };
 
@@ -193,7 +193,7 @@ void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Op
         llvm::FunctionType *functionType = llvm::FunctionType::get(IntegerType, argumentTypes, false);
         functionMap[definition.GetName()] = llvm::cast<llvm::Function>(llvmModule->getOrInsertFunction(definition.GetName(), functionType));
     }
-    
+
     llvm::Function *mainFunc = llvm::cast<llvm::Function>(
         llvmModule->getOrInsertFunction(MainFunctionName, IntegerType));
     {
@@ -201,7 +201,7 @@ void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Op
         llvm::IRBuilder<> builder(mainBlock);
         IRGenerator<TNumber> generator(llvmContext, &builder, mainFunc, functionMap);
         op->Accept(generator);
-        builder.CreateRet(generator.value);
+        generator.builder->CreateRet(generator.value);
     }
 
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
@@ -212,14 +212,14 @@ void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Op
 
         IRGenerator<TNumber> generator(llvmContext, &builder, function, functionMap);
         context.GetOperatorImplement(definition.GetName()).GetOperator()->Accept(generator);
-        builder.CreateRet(generator.value);
+        generator.builder->CreateRet(generator.value);
     }
 }
 
 template<typename TNumber>
 TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<Operator<TNumber>> &op) {
     using namespace llvm;
-    
+
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
@@ -268,7 +268,7 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     // PrintIR
     outs() << "After optimized:\n\n" << *M << "\n";
     outs().flush();
-    
+
     // JIT
     EngineBuilder ebuilder(std::move(Owner));
     std::string error = "No error";
@@ -279,7 +279,7 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     // Call
     auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
     TNumber result = func();
-    
+
     delete EE;
     llvm_shutdown();
     return result;
