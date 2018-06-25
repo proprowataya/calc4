@@ -2,6 +2,7 @@
 #include <ctime>
 #include "Operators.h"
 #include "SyntaxAnalysis.h"
+#include "Jit.h"
 
 template<typename TNumber>
 void PrintTree(const Operator<TNumber> &op, int depth) {
@@ -33,6 +34,13 @@ int main() {
         clock_t end = clock();
         cout << eval.value << endl
             << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC << endl
+            << endl;
+
+        start = clock();
+        int result = RunByJIT<int>(context, op);
+        end = clock();
+        cout << result << endl
+            << "JIT Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC << endl
             << endl;
     }
 

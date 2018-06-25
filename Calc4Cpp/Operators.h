@@ -79,6 +79,14 @@ public:
             return nullptr;
         }
     }
+
+    decltype(userDefinedOperators.cbegin()) UserDefinedOperatorBegin() const {
+        return userDefinedOperators.cbegin();
+    }
+
+    decltype(userDefinedOperators.cend()) UserDefinedOperatorEnd() const {
+        return userDefinedOperators.cend();
+    }
 };
 
 /* ********** */
