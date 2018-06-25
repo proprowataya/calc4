@@ -15,6 +15,7 @@ class Token {
 public:
     virtual int GetNumOperands() const = 0;
     virtual const std::string &GetSupplementaryText() const = 0;
+    virtual ~Token() {}
 };
 
 #define MAKE_GET_SUPPLEMENTARY_TEXT virtual const std::string &GetSupplementaryText() const override {\
@@ -171,7 +172,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
         Implement(const std::string &text, CompilationContext<TNumber> &context)
             : text(text), context(context), index(0) {}
         Implement(const std::string &text, CompilationContext<TNumber> &context, const std::vector<std::string> &arguments)
-            : text(text), context(context), index(0), arguments(arguments) {}
+            : text(text), context(context), arguments(arguments), index(0) {}
 
         std::vector<std::shared_ptr<Token>> Lex() {
             std::vector<std::shared_ptr<Token>> vec;
@@ -274,7 +275,9 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    throw "Error";
+                    // TODO:
+                    // throw "Error";
+                    return nullptr;
                 }
             }
         }
@@ -353,7 +356,9 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    throw "Error";
+                    // TODO:
+                    // throw "Error";
+                    return nullptr;
                 }
             }
         }
@@ -434,7 +439,9 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
 
             switch (results.size()) {
             case 0:
-                throw "Invalid";
+                // TODO:
+                // throw "Invalid";
+                return nullptr;
             case 1:
                 return results[0];
             default:
@@ -470,7 +477,9 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
             } else if (auto userDefined = dynamic_cast<const UserDefinedOperatorToken *>(ptr)) {
                 return std::make_shared<UserDefinedOperator<TNumber>>(userDefined->GetDefinition(), operands);
             } else {
-                throw "Invalid";
+                // TODO:
+                // throw "Error";
+                return nullptr;
             }
         }
 

@@ -96,6 +96,7 @@ class Operator {
 public:
     virtual void Accept(OperatorVisitor<TNumber> &visitor) const = 0;
     virtual std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const = 0;
+    virtual ~Operator() {}
 };
 
 #define MAKE_ACCEPT virtual void Accept(OperatorVisitor<TNumber> &visitor) const override {\
