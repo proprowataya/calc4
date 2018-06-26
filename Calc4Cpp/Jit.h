@@ -181,7 +181,7 @@ public:
 };
 
 template<typename TNumber>
-void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Operator<TNumber>> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule) {
+void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule) {
     static constexpr size_t IntegerBits = sizeof(TNumber) * 8;
     llvm::Type *IntegerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits);
 
@@ -217,32 +217,26 @@ void GenerateIR(const CompilationContext<int> &context, const std::shared_ptr<Op
 }
 
 template<typename TNumber>
-TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<Operator<TNumber>> &op) {
+TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, bool printIR) {
     using namespace llvm;
     LLVMContext Context;
 
     // Create some module to put our function into it.
     std::unique_ptr<Module> Owner = make_unique<Module>("test", Context);
     Module *M = Owner.get();
+    M->setTargetTriple(LLVM_HOST_TRIPLE);
 
     // Generate IR
     GenerateIR(context, op, &Context, M);
 
-    // PrintIR
-    outs() << "Before optimized:\n---------------------------\n" << *M << "\n";
-    outs().flush();
+    if (printIR) {
+        // PrintIR
+        outs() << "Before optimized:\n---------------------------\n" << *M << "\n";
+        outs().flush();
+    }
 
     // Optimize
-#if false
-    legacy::PassManager PM;
-    // mpm.add(createIPSCCPPass());
-    PM.add(createFunctionInliningPass(OptLevel, SizeLevel, false));
-    // mpm.add(createLICMPass());
-    // mpm.add(createGVNPass());
-    // mpm.add(createGlobalDCEPass());
-    PM.run(*M);
-#else
-    constexpr int OptLevel = 3, SizeLevel = 0;
+    static constexpr int OptLevel = 3, SizeLevel = 0;
 
     legacy::PassManager PM;
     legacy::FunctionPassManager FPM(M);
@@ -258,23 +252,27 @@ TNumber RunByJIT(const CompilationContext<int> &context, const std::shared_ptr<O
     }
 
     PM.run(*M);
-#endif
 
-    // PrintIR
-    outs() << "After optimized:\n---------------------------\n" << *M << "\n";
-    outs().flush();
+    if (printIR) {
+        // PrintIR
+        outs() << "After optimized:\n---------------------------\n" << *M << "\n";
+        outs().flush();
+    }
 
     // JIT
     EngineBuilder ebuilder(std::move(Owner));
     std::string error = "No error";
     ebuilder.setErrorStr(&error).setEngineKind(EngineKind::Kind::JIT);
     ExecutionEngine *EE = ebuilder.create();
-    outs() << "---------------------------\nError: " << error << "\n";
 
     // Call
     auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
-    TNumber result = func();
 
+    if (printIR) {
+        outs() << "---------------------------\nError: " << error << "\n";
+    }
+
+    TNumber result = func();
     delete EE;
     return result;
 }
