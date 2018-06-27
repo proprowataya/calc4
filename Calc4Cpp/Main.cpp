@@ -46,21 +46,31 @@ int main() {
         LLVMInitializeNativeAsmParser();
     }
 
-    cout << "Calc4 Interpreter" << endl
-        << "ExecutionType: " << GetExecutionTypeString(type) << endl
+    cout << "Calc4 REPL" << endl
+        << "Executor type: " << GetExecutionTypeString(type) << endl
         << endl;
 
-    bool printIR = true;
+    bool optimize = true, printInfo = true;
     while (true) {
         string line;
         cout << "> ";
         getline(cin, line);
 
         if (line == "#print on") {
-            printIR = true;
+            printInfo = true;
+            cout << endl;
             continue;
         } else if (line == "#print off") {
-            printIR = false;
+            printInfo = false;
+            cout << endl;
+            continue;
+        } else if (line == "#optimize on") {
+            optimize = true;
+            cout << endl;
+            continue;
+        } else if (line == "#optimize off") {
+            optimize = false;
+            cout << endl;
             continue;
         }
 
@@ -68,13 +78,32 @@ int main() {
         auto tokens = Lex(line, context);
         auto op = Parse(tokens, context);
 
+        if (printInfo) {
+            cout << "Tree:" << endl
+                << "---------------------------" << endl
+                << "Module {" << endl
+                << "Main:" << endl;
+            PrintTree<NumberType>(*op, 1);
+            cout << endl;
+
+            for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
+                auto& name = it->second.GetDefinition().GetName();
+                auto& op = it->second.GetOperator();
+
+                cout << name << ":" << endl;
+                PrintTree<NumberType>(*op, 1);
+            }
+
+            cout << "}" << endl << "---------------------------" << endl << endl;
+        }
+
         NumberType result;
         clock_t start = clock();
         {
             switch (type) {
             case ExecutionType::JIT:
             {
-                result = RunByJIT<NumberType>(context, op, printIR);
+                result = RunByJIT<NumberType>(context, op, optimize, printInfo);
                 break;
             }
             case ExecutionType::Interpreter:

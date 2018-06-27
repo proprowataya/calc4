@@ -217,46 +217,48 @@ void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_pt
 }
 
 template<typename TNumber>
-TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, bool printIR) {
+TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, bool optimize, bool printInfo) {
     using namespace llvm;
     LLVMContext Context;
 
     // Create some module to put our function into it.
-    std::unique_ptr<Module> Owner = make_unique<Module>("test", Context);
+    std::unique_ptr<Module> Owner = make_unique<Module>("calc4-jit-module", Context);
     Module *M = Owner.get();
     M->setTargetTriple(LLVM_HOST_TRIPLE);
 
     // Generate IR
     GenerateIR(context, op, &Context, M);
 
-    if (printIR) {
+    if (printInfo) {
         // PrintIR
-        outs() << "Before optimized:\n---------------------------\n" << *M << "\n";
+        outs() << "LLVM IR (Before optimized):\n---------------------------\n" << *M << "---------------------------\n\n";
         outs().flush();
     }
 
-    // Optimize
-    static constexpr int OptLevel = 3, SizeLevel = 0;
+    if (optimize) {
+        // Optimize
+        static constexpr int OptLevel = 3, SizeLevel = 0;
 
-    legacy::PassManager PM;
-    legacy::FunctionPassManager FPM(M);
-    PassManagerBuilder PMB;
-    PMB.OptLevel = OptLevel;
-    PMB.SizeLevel = SizeLevel;
-    PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel, false);
-    PMB.populateFunctionPassManager(FPM);
-    PMB.populateModulePassManager(PM);
+        legacy::PassManager PM;
+        legacy::FunctionPassManager FPM(M);
+        PassManagerBuilder PMB;
+        PMB.OptLevel = OptLevel;
+        PMB.SizeLevel = SizeLevel;
+        PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel, false);
+        PMB.populateFunctionPassManager(FPM);
+        PMB.populateModulePassManager(PM);
 
-    for (auto &func : *M) {
-        FPM.run(func);
-    }
+        for (auto &func : *M) {
+            FPM.run(func);
+        }
 
-    PM.run(*M);
+        PM.run(*M);
 
-    if (printIR) {
-        // PrintIR
-        outs() << "After optimized:\n---------------------------\n" << *M << "\n";
-        outs().flush();
+        if (printInfo) {
+            // PrintIR
+            outs() << "LLVM IR (After optimized):\n---------------------------\n" << *M << "---------------------------\n\n";
+            outs().flush();
+        }
     }
 
     // JIT
@@ -268,8 +270,8 @@ TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_p
     // Call
     auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
 
-    if (printIR) {
-        outs() << "---------------------------\nError: " << error << "\n";
+    if (printInfo) {
+        outs() << "Error: " << error << "\n";
     }
 
     TNumber result = func();
