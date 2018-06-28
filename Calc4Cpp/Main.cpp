@@ -23,6 +23,43 @@ void PrintTree(const Operator<TNumber> &op, int depth) {
     }
 }
 
+template<typename TNumber>
+bool HasRecursiveCallInternal(const Operator<TNumber> &op, const CompilationContext<TNumber> &context, std::unordered_map<const OperatorDefinition *, int> called) {
+    if (auto userDefined = dynamic_cast<const UserDefinedOperator<TNumber> *>(&op)) {
+        auto& definition = userDefined->GetDefinition();
+        if (++called[&definition] > 1) {
+            // Recursive call detected
+            return true;
+        }
+
+        if (HasRecursiveCallInternal(*context.GetOperatorImplement(definition.GetName()).GetOperator(), context, called)) {
+            --called[&definition];
+            return true;
+        } else {
+            --called[&definition];
+        }
+    } else if (auto parenthesis = dynamic_cast<const ParenthesisOperator<TNumber> *>(&op)) {
+        for (auto& op2 : parenthesis->GetOperators()) {
+            if (HasRecursiveCallInternal(*op2, context, called)) {
+                return true;
+            }
+        }
+    }
+
+    for (auto& operand : op.GetOperands()) {
+        if (HasRecursiveCallInternal(*operand, context, called)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template<typename TNumber>
+bool HasRecursiveCall(const Operator<TNumber> &op, const CompilationContext<TNumber> &context) {
+    return HasRecursiveCallInternal(op, context, {});
+}
+
 const char *GetExecutionTypeString(ExecutionType type) {
     switch (type) {
     case ExecutionType::JIT:
@@ -50,7 +87,7 @@ int main() {
         << "Executor type: " << GetExecutionTypeString(type) << endl
         << endl;
 
-    bool optimize = true, printInfo = true;
+    bool optimize = true, printInfo = true, alwaysJIT = false;
     while (true) {
         string line;
         cout << "> ";
@@ -77,8 +114,11 @@ int main() {
         CompilationContext<NumberType> context;
         auto tokens = Lex(line, context);
         auto op = Parse(tokens, context);
+        bool hasRecursiveCall = HasRecursiveCall(*op, context);
 
         if (printInfo) {
+            cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
+
             cout << "Tree:" << endl
                 << "---------------------------" << endl
                 << "Module {" << endl
@@ -100,23 +140,12 @@ int main() {
         NumberType result;
         clock_t start = clock();
         {
-            switch (type) {
-            case ExecutionType::JIT:
-            {
+            if (type == ExecutionType::JIT && (alwaysJIT || HasRecursiveCall(*op, context))) {
                 result = RunByJIT<NumberType>(context, op, optimize, printInfo);
-                break;
-            }
-            case ExecutionType::Interpreter:
-            {
+            } else {
                 Evaluator<NumberType> eval(&context);
                 op->Accept(eval);
                 result = eval.value;
-                break;
-            }
-            default:
-                cout << "Error: Unknown executor specified" << endl;
-                result = 0;
-                break;
             }
         }
         clock_t end = clock();
