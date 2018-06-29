@@ -151,7 +151,7 @@ int main() {
         clock_t end = clock();
 
         cout << result << endl
-            << "Elapsed: " << (double)(end - start) / CLOCKS_PER_SEC << endl
+            << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
             << endl;
     }
 

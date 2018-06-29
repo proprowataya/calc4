@@ -30,6 +30,7 @@
 #include <algorithm>
 
 constexpr const char *MainFunctionName = "__Main__";
+constexpr const char *EntryBlockName = "entry";
 
 template<typename TNumber>
 class IRGenerator : public OperatorVisitor<TNumber> {
@@ -197,7 +198,7 @@ void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_pt
     llvm::Function *mainFunc = llvm::cast<llvm::Function>(
         llvmModule->getOrInsertFunction(MainFunctionName, IntegerType));
     {
-        llvm::BasicBlock *mainBlock = llvm::BasicBlock::Create(*llvmContext, "", mainFunc);
+        llvm::BasicBlock *mainBlock = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, mainFunc);
         llvm::IRBuilder<> builder(mainBlock);
         IRGenerator<TNumber> generator(llvmContext, &builder, mainFunc, functionMap);
         op->Accept(generator);
@@ -207,7 +208,7 @@ void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_pt
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
         auto& definition = it->second.GetDefinition();
         llvm::Function *function = functionMap[definition.GetName()];
-        llvm::BasicBlock *block = llvm::BasicBlock::Create(*llvmContext, "", function);
+        llvm::BasicBlock *block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         llvm::IRBuilder<> builder(block);
 
         IRGenerator<TNumber> generator(llvmContext, &builder, function, functionMap);
