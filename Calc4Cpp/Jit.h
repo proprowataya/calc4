@@ -33,10 +33,11 @@ constexpr const char *MainFunctionName = "__Main__";
 constexpr const char *EntryBlockName = "entry";
 
 template<typename TNumber>
+size_t IntegerBits = sizeof(TNumber) * 8;
+
+template<typename TNumber>
 class IRGenerator : public OperatorVisitor<TNumber> {
 public:
-    static constexpr size_t IntegerBits = sizeof(TNumber) * 8;
-
     llvm::LLVMContext *context;
     llvm::IRBuilder<> *builder;
     llvm::Function *function;
@@ -47,11 +48,11 @@ public:
         : context(context), builder(builder), function(function), functionMap(functionMap) {}
 
     virtual void Visit(const ZeroOperator<TNumber> &op) override {
-        value = builder->getIntN(IntegerBits, 0);
+        value = builder->getIntN(IntegerBits<TNumber>, 0);
     }
 
     virtual void Visit(const PreComputedOperator<TNumber> &op) override {
-        value = builder->getIntN(IntegerBits, op.GetValue());
+        value = builder->getIntN(IntegerBits<TNumber>, op.GetValue());
     }
 
     virtual void Visit(const ArgumentOperator<TNumber> &op) override {
@@ -59,11 +60,11 @@ public:
     }
 
     virtual void Visit(const DefineOperator<TNumber> &op) override {
-        value = builder->getIntN(IntegerBits, 0);
+        value = builder->getIntN(IntegerBits<TNumber>, 0);
     }
 
     virtual void Visit(const ParenthesisOperator<TNumber> &op) override {
-        value = builder->getIntN(IntegerBits, 0);
+        value = builder->getIntN(IntegerBits<TNumber>, 0);
         for (auto& item : op.GetOperators()) {
             item->Accept(*this);
         }
@@ -73,8 +74,8 @@ public:
         op.GetOperand()->Accept(*this);
         auto operand = value;
 
-        auto multed = builder->CreateMul(operand, builder->getIntN(IntegerBits, 10));
-        value = builder->CreateAdd(multed, builder->getIntN(IntegerBits, op.GetValue()));
+        auto multed = builder->CreateMul(operand, builder->getIntN(IntegerBits<TNumber>, 10));
+        value = builder->CreateAdd(multed, builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
     }
 
     virtual void Visit(const BinaryOperator<TNumber> &op) override {
@@ -102,37 +103,37 @@ public:
         case BinaryType::Equal:
         {
             auto cmp = builder->CreateICmpEQ(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         case BinaryType::NotEqual:
         {
             auto cmp = builder->CreateICmpNE(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         case BinaryType::LessThan:
         {
             auto cmp = builder->CreateICmpSLT(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         case BinaryType::LessThanOrEqual:
         {
             auto cmp = builder->CreateICmpSLE(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         case BinaryType::GreaterThanOrEqual:
         {
             auto cmp = builder->CreateICmpSGE(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         case BinaryType::GreaterThan:
         {
             auto cmp = builder->CreateICmpSGT(left, right);
-            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits, 1), builder->getIntN(IntegerBits, 0));
+            value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
             break;
         }
         default:
@@ -141,9 +142,9 @@ public:
     }
 
     virtual void Visit(const ConditionalOperator<TNumber> &op) override {
-        llvm::Value *temp = builder->CreateAlloca(builder->getIntNTy(IntegerBits));
+        llvm::Value *temp = builder->CreateAlloca(builder->getIntNTy(IntegerBits<TNumber>));
         op.GetCondition()->Accept(*this);
-        auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits, 0)), builder->getInt1(1), builder->getInt1(0));
+        auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits<TNumber>, 0)), builder->getInt1(1), builder->getInt1(0));
         auto oldBuilder = builder;
 
         llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*context, "", function);
@@ -183,8 +184,7 @@ public:
 
 template<typename TNumber>
 void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule) {
-    static constexpr size_t IntegerBits = sizeof(TNumber) * 8;
-    llvm::Type *IntegerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits);
+    llvm::Type *IntegerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
 
     std::unordered_map<std::string, llvm::Function *> functionMap;
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
