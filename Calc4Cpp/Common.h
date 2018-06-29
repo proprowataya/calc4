@@ -5,3 +5,5 @@
 #else
 #define UNREACHABLE() __builtin_unreachable()
 #endif // _MSC_VER
+
+static constexpr size_t SPRINTF_BUFFER_SIZE = 256;

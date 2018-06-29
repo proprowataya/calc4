@@ -137,6 +137,7 @@ public:
             break;
         }
         default:
+            UNREACHABLE();
             break;
         }
     }

@@ -275,9 +275,9 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    // TODO:
-                    // throw "Error";
-                    return nullptr;
+                    static char buffer[SPRINTF_BUFFER_SIZE];
+                    sprintf(buffer, "Argument \"%s\" is not defined", name.c_str());
+                    throw std::string(buffer);
                 }
             }
         }
@@ -356,9 +356,9 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    // TODO:
-                    // throw "Error";
-                    return nullptr;
+                    static char buffer[SPRINTF_BUFFER_SIZE];
+                    sprintf(buffer, "Variable or operator \"%s\" is not defined", name.c_str());
+                    throw std::string(buffer);
                 }
             }
         }
@@ -439,9 +439,7 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
 
             switch (results.size()) {
             case 0:
-                // TODO:
-                // throw "Invalid";
-                return nullptr;
+                throw std::string("Invalid code");
             case 1:
                 return results[0];
             default:
@@ -477,9 +475,8 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
             } else if (auto userDefined = dynamic_cast<const UserDefinedOperatorToken *>(ptr)) {
                 return std::make_shared<UserDefinedOperator<TNumber>>(userDefined->GetDefinition(), operands);
             } else {
-                // TODO:
-                // throw "Error";
-                return nullptr;
+                UNREACHABLE();
+                throw std::string("Assertion error");
             }
         }
 

@@ -122,70 +122,74 @@ int main() {
 
     bool optimize = true, printInfo = true, alwaysJIT = false;
     while (true) {
-        string line;
-        cout << "> ";
-        getline(cin, line);
+        try {
+            string line;
+            cout << "> ";
+            getline(cin, line);
 
-        if (line == "#print on") {
-            printInfo = true;
-            cout << endl;
-            continue;
-        } else if (line == "#print off") {
-            printInfo = false;
-            cout << endl;
-            continue;
-        } else if (line == "#optimize on") {
-            optimize = true;
-            cout << endl;
-            continue;
-        } else if (line == "#optimize off") {
-            optimize = false;
-            cout << endl;
-            continue;
-        }
+            if (line == "#print on") {
+                printInfo = true;
+                cout << endl;
+                continue;
+            } else if (line == "#print off") {
+                printInfo = false;
+                cout << endl;
+                continue;
+            } else if (line == "#optimize on") {
+                optimize = true;
+                cout << endl;
+                continue;
+            } else if (line == "#optimize off") {
+                optimize = false;
+                cout << endl;
+                continue;
+            }
 
-        CompilationContext<NumberType> context;
-        auto tokens = Lex(line, context);
-        auto op = Parse(tokens, context);
-        bool hasRecursiveCall = HasRecursiveCall(*op, context);
+            CompilationContext<NumberType> context;
+            auto tokens = Lex(line, context);
+            auto op = Parse(tokens, context);
+            bool hasRecursiveCall = HasRecursiveCall(*op, context);
 
-        if (printInfo) {
-            cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
+            if (printInfo) {
+                cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
 
-            cout << "Tree:" << endl
-                << "---------------------------" << endl
-                << "Module {" << endl
-                << "Main:" << endl;
-            PrintTree<NumberType>(*op, 1);
-            cout << endl;
-
-            for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
-                auto& name = it->second.GetDefinition().GetName();
-                auto& op = it->second.GetOperator();
-
-                cout << name << ":" << endl;
+                cout << "Tree:" << endl
+                    << "---------------------------" << endl
+                    << "Module {" << endl
+                    << "Main:" << endl;
                 PrintTree<NumberType>(*op, 1);
+                cout << endl;
+
+                for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
+                    auto& name = it->second.GetDefinition().GetName();
+                    auto& op = it->second.GetOperator();
+
+                    cout << name << ":" << endl;
+                    PrintTree<NumberType>(*op, 1);
+                }
+
+                cout << "}" << endl << "---------------------------" << endl << endl;
             }
 
-            cout << "}" << endl << "---------------------------" << endl << endl;
-        }
-
-        NumberType result;
-        clock_t start = clock();
-        {
-            if (type == ExecutionType::JIT && (alwaysJIT || HasRecursiveCall(*op, context))) {
-                result = RunByJIT<NumberType>(context, op, optimize, printInfo);
-            } else {
-                Evaluator<NumberType> eval(&context);
-                op->Accept(eval);
-                result = eval.value;
+            NumberType result;
+            clock_t start = clock();
+            {
+                if (type == ExecutionType::JIT && (alwaysJIT || HasRecursiveCall(*op, context))) {
+                    result = RunByJIT<NumberType>(context, op, optimize, printInfo);
+                } else {
+                    Evaluator<NumberType> eval(&context);
+                    op->Accept(eval);
+                    result = eval.value;
+                }
             }
-        }
-        clock_t end = clock();
+            clock_t end = clock();
 
-        cout << result << endl
-            << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
-            << endl;
+            cout << result << endl
+                << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
+                << endl;
+        } catch (std::string &error) {
+            cout << "Error: " << error << endl << endl;
+        }
     }
 
     llvm_shutdown();
