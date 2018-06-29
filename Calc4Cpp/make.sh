@@ -1,6 +1,6 @@
-LLVM_VERSION=7
+LLVM_VERSION_SUFFIX=-7
 OPTIMIZE=-Ofast
 DEBUG=-DNDEBUG
 #DEBUG=-g
 
-clang++-${LLVM_VERSION} `llvm-config-${LLVM_VERSION} --cxxflags --ldflags --libs --system-libs` -std=c++14 ${OPTIMIZE} ${DEBUG} ./Main.cpp
+clang++${LLVM_VERSION_SUFFIX} `llvm-config${LLVM_VERSION_SUFFIX} --cxxflags --ldflags --libs --system-libs` -std=c++14 -fexceptions ${OPTIMIZE} ${DEBUG} ./Main.cpp
