@@ -4,6 +4,7 @@
 #include "Operators.h"
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
+#include "Test.h"
 
 constexpr const char *ProgramName = "Calc4 REPL";
 
@@ -21,6 +22,7 @@ struct Option {
 
 namespace CommandLineArgs {
     constexpr const char *Help = "--help";
+    constexpr const char *PerformTest = "--test";
     constexpr const char *EnableJit = "--jit-on";
     constexpr const char *DisableJit = "--jit-off";
     constexpr const char *AlwaysJit = "--always-jit";
@@ -34,7 +36,6 @@ namespace CommandLineArgs {
 inline bool StringEquals(const char *a, const char *b);
 void PrintHelp(int argc, char **argv);
 template<typename TNumber> void ReplCore(const std::string &line, const Option &option);
-std::ostream& operator<<(std::ostream& dest, __int128_t value);
 template<typename TNumber> void PrintTree(const Operator<TNumber> &op, int depth);
 template<typename TNumber> bool HasRecursiveCall(const Operator<TNumber> &op, const CompilationContext<TNumber> &context);
 template<typename TNumber> bool HasRecursiveCallInternal(const Operator<TNumber> &op, const CompilationContext<TNumber> &context, std::unordered_map<const OperatorDefinition *, int> called);
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
     using namespace llvm;
 
     Option option;
+    bool performTest = false;
 
     // Parse command line args
     for (int i = 1; i < argc; i++) {
@@ -62,6 +64,8 @@ int main(int argc, char **argv) {
         if (StringEquals(str, CommandLineArgs::Help)) {
             PrintHelp(argc, argv);
             return 0;
+        } else if (StringEquals(str, CommandLineArgs::PerformTest)) {
+            performTest = true;
         } else if (StringEquals(str, CommandLineArgs::EnableJit)) {
             option.executionType = ExecutionType::JIT;
         } else if (StringEquals(str, CommandLineArgs::DisableJit)) {
@@ -83,18 +87,25 @@ int main(int argc, char **argv) {
     cout << ProgramName << endl;
 
     // Print current setting
-    cout
-        << "    Integer size: " << option.integerSize << endl
-        << "    Executor: " << GetExecutionTypeString(option.executionType) << endl
-        << "    Always JIT: " << (option.alwaysJit ? "on" : "off") << endl
-        << "    Optimize: " << (option.optimize ? "on" : "off") << endl
-        << endl;
+    if (!performTest) {
+        cout
+            << "    Integer size: " << option.integerSize << endl
+            << "    Executor: " << GetExecutionTypeString(option.executionType) << endl
+            << "    Always JIT: " << (option.alwaysJit ? "on" : "off") << endl
+            << "    Optimize: " << (option.optimize ? "on" : "off") << endl
+            << endl;
+    }
 
     // Initialize LLVM if needed
-    if (option.executionType == ExecutionType::JIT) {
+    if (performTest || option.executionType == ExecutionType::JIT) {
         LLVMInitializeNativeTarget();
         LLVMInitializeNativeAsmPrinter();
         LLVMInitializeNativeAsmParser();
+    }
+
+    if (performTest) {
+        TestAll();
+        return 0;
     }
 
     while (true) {
@@ -210,35 +221,6 @@ void ReplCore(const std::string &line, const Option &option) {
     cout << result << endl
         << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
         << endl;
-}
-
-// https://stackoverflow.com/questions/25114597/how-to-print-int128-in-g
-std::ostream& operator<<(std::ostream& dest, __int128_t value) {
-    std::ostream::sentry s(dest);
-
-    if (s) {
-        __uint128_t tmp = value < 0 ? -value : value;
-        char buffer[128];
-        char* d = std::end(buffer);
-
-        do {
-            --d;
-            *d = "0123456789"[tmp % 10];
-            tmp /= 10;
-        } while (tmp != 0);
-        if (value < 0) {
-            --d;
-            *d = '-';
-        }
-
-        int len = std::end(buffer) - d;
-
-        if (dest.rdbuf()->sputn(d, len) != len) {
-            dest.setstate(std::ios_base::badbit);
-        }
-    }
-
-    return dest;
 }
 
 template<typename TNumber>

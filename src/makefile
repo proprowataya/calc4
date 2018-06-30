@@ -1,5 +1,5 @@
 PROGRAM = calc4
-OBJS = Jit.o Main.o Common.o
+OBJS = Jit.o Test.o Main.o Common.o
 
 CC = clang${LLVM_VERSION_SUFFIX}
 CXX = clang++${LLVM_VERSION_SUFFIX}
