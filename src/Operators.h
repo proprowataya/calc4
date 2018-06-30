@@ -252,48 +252,8 @@ public:
     }
 
     virtual std::string ToString() const override {
-        const char *typeString;
-
-        switch (type) {
-        case BinaryType::Add:
-            typeString = "Add";
-            break;
-        case BinaryType::Sub:
-            typeString = "Sub";
-            break;
-        case BinaryType::Mult:
-            typeString = "Mult";
-            break;
-        case BinaryType::Div:
-            typeString = "Div";
-            break;
-        case BinaryType::Mod:
-            typeString = "Mod";
-            break;
-        case BinaryType::Equal:
-            typeString = "Equal";
-            break;
-        case BinaryType::NotEqual:
-            typeString = "NotEqual";
-            break;
-        case BinaryType::LessThan:
-            typeString = "LessThan";
-            break;
-        case BinaryType::LessThanOrEqual:
-            typeString = "LessThanOrEqual";
-            break;
-        case BinaryType::GreaterThanOrEqual:
-            typeString = "GreaterThanOrEqual";
-            break;
-        case BinaryType::GreaterThan:
-            typeString = "GreaterThan";
-            break;
-        default:
-            typeString = "<Unknown>";
-            break;
-        }
-
-        sprintf(sprintfBuffer, "BinaryOperator [Type = %s]", typeString);
+        static const char *BinaryTypeTable[] = { "Add", "Sub", "Mult", "Div", "Mod", "Equal", "NotEqual", "LessThan", "LessThanOrEqual", "GreaterThanOrEqual", "GreaterThan" };
+        sprintf(sprintfBuffer, "BinaryOperator [Type = %s]", BinaryTypeTable[(size_t)type]);
         return std::string(sprintfBuffer);
     }
 
