@@ -218,28 +218,23 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             index++;
 
             std::string supplementaryText = LexSupplementaryText();
-            std::string splitted[3];
 
             // Split supplementaryText into three strings
-            for (size_t i = 0, begin = 0; i < 3; i++) {
-                size_t end = supplementaryText.find_first_of('|', begin);
-                splitted[i] = supplementaryText.substr(begin, end - begin);
-                begin = end + 1;
+            std::vector<std::string> splitted = Split(supplementaryText, '|');
+            if (splitted.size() != 3) {
+                sprintf(sprintfBuffer, ErrorMessage::DefinitionTextNotSplittedProperly, supplementaryText.c_str());
+                throw std::string(sprintfBuffer);
             }
 
             // Split arguments
-            std::vector<std::string> arguments;
-            for (size_t begin = 0; begin < splitted[1].length();) {
-                size_t end = splitted[1].find_first_of(',', begin);
-                arguments.push_back(splitted[1].substr(begin, end - begin));
+            std::vector<std::string> arguments = Split(splitted[1], ',');
 
-                if (end == std::string::npos) {
-                    break;
-                } else {
-                    begin = end + 1;
-                }
+            // Trim arguments (e.g. "  x " => "x")
+            for (auto& arg : arguments) {
+                arg = TrimWhiteSpaces(arg);
             }
 
+            // Operator name
             auto &name = splitted[0];
 
             // Update CompilationContext
@@ -262,9 +257,12 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
 
             size_t begin = index;
             size_t end = text.find_first_of('}', begin);
-            std::string name = text.substr(begin, end - begin);
+            if (end == std::string::npos) {
+                sprintf(sprintfBuffer, ErrorMessage::TokenExpected, "}");
+                throw std::string(sprintfBuffer);
+            }
 
-            assert(end != std::string::npos);
+            std::string name = text.substr(begin, end - begin);
             index = end + 1;
 
             if (auto implement = context.TryGetOperatorImplement(name)) {
@@ -275,9 +273,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    static char buffer[SPRINTF_BUFFER_SIZE];
-                    sprintf(buffer, "Argument \"%s\" is not defined", name.c_str());
-                    throw std::string(buffer);
+                    sprintf(sprintfBuffer, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
+                    throw std::string(sprintfBuffer);
                 }
             }
         }
@@ -291,9 +288,13 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             auto tokens = implement.Lex();
 
             index = implement.index;
-            assert(text[index] == ')');
-            index++;
 
+            if (index >= text.length() || text[index] != ')') {
+                sprintf(sprintfBuffer, ErrorMessage::TokenExpected, ")");
+                throw std::string(sprintfBuffer);
+            }
+
+            index++;
             return std::make_shared<ParenthesisToken>(tokens, LexSupplementaryText());
         }
 
@@ -356,9 +357,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    static char buffer[SPRINTF_BUFFER_SIZE];
-                    sprintf(buffer, "Variable or operator \"%s\" is not defined", name.c_str());
-                    throw std::string(buffer);
+                    sprintf(sprintfBuffer, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
+                    throw std::string(sprintfBuffer);
                 }
             }
         }
@@ -411,9 +411,13 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
                 std::vector<std::shared_ptr<Operator<TNumber>>> operands;
 
                 auto lower = ReadLower();
-                if (lower.empty() && !tokens.empty()
-                    && dynamic_cast<const DecimalToken *>(tokens.begin()->get()) != nullptr) {
-                    operands.push_back(std::make_shared<ZeroOperator<TNumber>>());
+                if (lower.empty()) {
+                    if (!tokens.empty() && dynamic_cast<const DecimalToken *>(tokens.begin()->get()) != nullptr) {
+                        operands.push_back(std::make_shared<ZeroOperator<TNumber>>());
+                    } else {
+                        sprintf(sprintfBuffer, ErrorMessage::SomeOperandsMissing);
+                        throw std::string(sprintfBuffer);
+                    }
                 } else {
                     operands.push_back(Implement(lower, context).Parse());
                 }
@@ -423,7 +427,13 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
                     index++;
 
                     while (operands.size() < static_cast<size_t>(maxNumOperands)) {
-                        operands.push_back(Implement(ReadLower(), context).Parse());
+                        auto lower = ReadLower();
+                        if (lower.empty()) {
+                            sprintf(sprintfBuffer, ErrorMessage::SomeOperandsMissing);
+                            throw std::string(sprintfBuffer);
+                        }
+
+                        operands.push_back(Implement(lower, context).Parse());
                         if (operands.size() < static_cast<size_t>(maxNumOperands)) {
                             index++;
                         }
@@ -476,7 +486,7 @@ std::shared_ptr<Operator<TNumber>> Parse(const std::vector<std::shared_ptr<Token
                 return std::make_shared<UserDefinedOperator<TNumber>>(userDefined->GetDefinition(), operands);
             } else {
                 UNREACHABLE();
-                throw std::string("Assertion error");
+                throw std::string(ErrorMessage::AssertionError);
             }
         }
 
