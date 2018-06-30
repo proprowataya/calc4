@@ -79,6 +79,14 @@ public:
             return nullptr;
         }
     }
+
+    decltype(userDefinedOperators.cbegin()) UserDefinedOperatorBegin() const {
+        return userDefinedOperators.cbegin();
+    }
+
+    decltype(userDefinedOperators.cend()) UserDefinedOperatorEnd() const {
+        return userDefinedOperators.cend();
+    }
 };
 
 /* ********** */
@@ -88,6 +96,8 @@ class Operator {
 public:
     virtual void Accept(OperatorVisitor<TNumber> &visitor) const = 0;
     virtual std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const = 0;
+    virtual std::string ToString() const = 0;
+    virtual ~Operator() {}
 };
 
 #define MAKE_ACCEPT virtual void Accept(OperatorVisitor<TNumber> &visitor) const override {\
@@ -101,6 +111,10 @@ public:
 template<typename TNumber>
 class ZeroOperator : public Operator<TNumber> {
 public:
+    virtual std::string ToString() const override {
+        return std::string("ZeroOperator []");
+    }
+
     MAKE_ACCEPT;
     MAKE_GET_OPERANDS()
 };
@@ -116,6 +130,11 @@ public:
 
     TNumber GetValue() const {
         return value;
+    }
+
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "PreComputedOperator [Value = %s]", std::to_string(value));
+        return std::string(sprintfBuffer);
     }
 
     MAKE_ACCEPT;
@@ -135,6 +154,11 @@ public:
         return index;
     }
 
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "ArgumentOperator [Index = %d]", index);
+        return std::string(sprintfBuffer);
+    }
+
     MAKE_ACCEPT;
     MAKE_GET_OPERANDS()
 };
@@ -142,6 +166,11 @@ public:
 template<typename TNumber>
 class DefineOperator : public Operator<TNumber> {
 public:
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "DefineOperator []");
+        return std::string(sprintfBuffer);
+    }
+
     MAKE_ACCEPT;
     MAKE_GET_OPERANDS()
 };
@@ -160,6 +189,11 @@ public:
 
     const std::vector<std::shared_ptr<Operator<TNumber>>> &GetOperators() const {
         return operators;
+    }
+
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "ParenthesisOperator [%d operators]", static_cast<int>(operators.size()));
+        return std::string(sprintfBuffer);
     }
 
     MAKE_ACCEPT;
@@ -182,6 +216,11 @@ public:
 
     int GetValue() const {
         return value;
+    }
+
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "DecimalOperator [Value = %d]", value);
+        return std::string(sprintfBuffer);
     }
 
     MAKE_ACCEPT;
@@ -212,6 +251,12 @@ public:
         return right;
     }
 
+    virtual std::string ToString() const override {
+        static const char *BinaryTypeTable[] = { "Add", "Sub", "Mult", "Div", "Mod", "Equal", "NotEqual", "LessThan", "LessThanOrEqual", "GreaterThanOrEqual", "GreaterThan" };
+        sprintf(sprintfBuffer, "BinaryOperator [Type = %s]", BinaryTypeTable[(size_t)type]);
+        return std::string(sprintfBuffer);
+    }
+
     MAKE_ACCEPT;
     MAKE_GET_OPERANDS(left, right)
 };
@@ -235,6 +280,11 @@ public:
 
     const std::shared_ptr<Operator<TNumber>> &GetIfFalse() const {
         return ifFalse;
+    }
+
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "ConditionalOperator []");
+        return std::string(sprintfBuffer);
     }
 
     MAKE_ACCEPT;
@@ -261,6 +311,11 @@ public:
     // TODO:
     std::vector<std::shared_ptr<Operator<TNumber>>> GetOperands() const override {
         return operands;
+    }
+
+    virtual std::string ToString() const override {
+        sprintf(sprintfBuffer, "UserDefinedOperator [Name = %s, NumOperands = %d]", definition.GetName().c_str(), definition.GetNumOperands());
+        return std::string(sprintfBuffer);
     }
 
     MAKE_ACCEPT;
