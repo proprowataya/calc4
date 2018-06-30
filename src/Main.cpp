@@ -5,6 +5,7 @@
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
 #include "Test.h"
+#include "Evaluator.h"
 
 constexpr const char *ProgramName = "Calc4 REPL";
 
@@ -36,9 +37,9 @@ namespace CommandLineArgs {
 inline bool StringEquals(const char *a, const char *b);
 void PrintHelp(int argc, char **argv);
 template<typename TNumber> void ReplCore(const std::string &line, const Option &option);
-template<typename TNumber> void PrintTree(const Operator<TNumber> &op, int depth);
-template<typename TNumber> bool HasRecursiveCall(const Operator<TNumber> &op, const CompilationContext<TNumber> &context);
-template<typename TNumber> bool HasRecursiveCallInternal(const Operator<TNumber> &op, const CompilationContext<TNumber> &context, std::unordered_map<const OperatorDefinition *, int> called);
+void PrintTree(const Operator &op, int depth);
+bool HasRecursiveCall(const Operator &op, const CompilationContext &context);
+bool HasRecursiveCallInternal(const Operator &op, const CompilationContext &context, std::unordered_map<const OperatorDefinition *, int> called);
 const char *GetExecutionTypeString(ExecutionType type);
 
 int main(int argc, char **argv) {
@@ -179,7 +180,7 @@ void ReplCore(const std::string &line, const Option &option) {
     using namespace std;
     using namespace llvm;
 
-    CompilationContext<TNumber> context;
+    CompilationContext context;
     auto tokens = Lex(line, context);
     auto op = Parse(tokens, context);
     bool hasRecursiveCall = HasRecursiveCall(*op, context);
@@ -191,7 +192,7 @@ void ReplCore(const std::string &line, const Option &option) {
             << "---------------------------" << endl
             << "Module {" << endl
             << "Main:" << endl;
-        PrintTree<TNumber>(*op, 1);
+        PrintTree(*op, 1);
         cout << endl;
 
         for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
@@ -199,7 +200,7 @@ void ReplCore(const std::string &line, const Option &option) {
             auto& op = it->second.GetOperator();
 
             cout << name << ":" << endl;
-            PrintTree<TNumber>(*op, 1);
+            PrintTree(*op, 1);
         }
 
         cout << "}" << endl << "---------------------------" << endl << endl;
@@ -223,8 +224,7 @@ void ReplCore(const std::string &line, const Option &option) {
         << endl;
 }
 
-template<typename TNumber>
-void PrintTree(const Operator<TNumber> &op, int depth) {
+void PrintTree(const Operator &op, int depth) {
     using namespace std;
 
     auto PrintIndent = [depth]() {
@@ -240,7 +240,7 @@ void PrintTree(const Operator<TNumber> &op, int depth) {
         PrintTree(*operand, depth + 1);
     }
 
-    if (auto parenthesis = dynamic_cast<const ParenthesisOperator<TNumber> *>(&op)) {
+    if (auto parenthesis = dynamic_cast<const ParenthesisOperator *>(&op)) {
         PrintIndent();
         cout << "Contains:" << endl;
         for (auto& op2 : parenthesis->GetOperators()) {
@@ -249,14 +249,12 @@ void PrintTree(const Operator<TNumber> &op, int depth) {
     }
 }
 
-template<typename TNumber>
-bool HasRecursiveCall(const Operator<TNumber> &op, const CompilationContext<TNumber> &context) {
+bool HasRecursiveCall(const Operator &op, const CompilationContext &context) {
     return HasRecursiveCallInternal(op, context, {});
 }
 
-template<typename TNumber>
-bool HasRecursiveCallInternal(const Operator<TNumber> &op, const CompilationContext<TNumber> &context, std::unordered_map<const OperatorDefinition *, int> called) {
-    if (auto userDefined = dynamic_cast<const UserDefinedOperator<TNumber> *>(&op)) {
+bool HasRecursiveCallInternal(const Operator &op, const CompilationContext &context, std::unordered_map<const OperatorDefinition *, int> called) {
+    if (auto userDefined = dynamic_cast<const UserDefinedOperator *>(&op)) {
         auto& definition = userDefined->GetDefinition();
         if (++called[&definition] > 1) {
             // Recursive call detected
@@ -269,7 +267,7 @@ bool HasRecursiveCallInternal(const Operator<TNumber> &op, const CompilationCont
         } else {
             --called[&definition];
         }
-    } else if (auto parenthesis = dynamic_cast<const ParenthesisOperator<TNumber> *>(&op)) {
+    } else if (auto parenthesis = dynamic_cast<const ParenthesisOperator *>(&op)) {
         for (auto& op2 : parenthesis->GetOperators()) {
             if (HasRecursiveCallInternal(*op2, context, called)) {
                 return true;

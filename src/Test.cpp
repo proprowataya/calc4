@@ -4,6 +4,7 @@
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
 #include "Test.h"
+#include "Evaluator.h"
 
 namespace {
     struct TestCase {
@@ -65,7 +66,7 @@ namespace {
         for (auto& optimize : { true, false }) {
             for (auto& jit : { true, false }) {
                 try {
-                    CompilationContext<TNumber> context;
+                    CompilationContext context;
                     auto tokens = Lex(test.input, context);
                     auto op = Parse(tokens, context);
 

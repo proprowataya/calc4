@@ -28,12 +28,12 @@
 #include "Operators.h"
 
 /* Explicit instantiation of "RunByJIT" Function */
-#define InstantiationRunByJIT(TNumber) template TNumber RunByJIT<TNumber>(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, bool optimize, bool printInfo)
-//InstantiationRunByJIT(int8_t);
-//InstantiationRunByJIT(int16_t);
-InstantiationRunByJIT(int32_t);
-InstantiationRunByJIT(int64_t);
-InstantiationRunByJIT(__int128_t);
+#define InstantiateRunByJIT(TNumber) template TNumber RunByJIT<TNumber>(const CompilationContext &context, const std::shared_ptr<Operator> &op, bool optimize, bool printInfo)
+//InstantiateRunByJIT(int8_t);
+//InstantiateRunByJIT(int16_t);
+InstantiateRunByJIT(int32_t);
+InstantiateRunByJIT(int64_t);
+InstantiateRunByJIT(__int128_t);
 
 namespace {
     constexpr const char *MainFunctionName = "__Main__";
@@ -42,14 +42,12 @@ namespace {
     template<typename TNumber>
     size_t IntegerBits = sizeof(TNumber) * 8;
 
-    template<typename TNumber>
-    void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule);
-    template<typename TNumber>
-    class IRGenerator;
+    template<typename TNumber> void GenerateIR(const CompilationContext &context, const std::shared_ptr<Operator> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule);
+    template<typename TNumber> class IRGenerator;
 }
 
 template<typename TNumber>
-TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, bool optimize, bool printInfo) {
+TNumber RunByJIT(const CompilationContext &context, const std::shared_ptr<Operator> &op, bool optimize, bool printInfo) {
     using namespace llvm;
     LLVMContext Context;
 
@@ -59,7 +57,7 @@ TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_p
     M->setTargetTriple(LLVM_HOST_TRIPLE);
 
     // Generate IR
-    GenerateIR(context, op, &Context, M);
+    GenerateIR<TNumber>(context, op, &Context, M);
 
     if (printInfo) {
         // PrintIR
@@ -113,7 +111,7 @@ TNumber RunByJIT(const CompilationContext<TNumber> &context, const std::shared_p
 
 namespace {
     template<typename TNumber>
-    void GenerateIR(const CompilationContext<TNumber> &context, const std::shared_ptr<Operator<TNumber>> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule) {
+    void GenerateIR(const CompilationContext &context, const std::shared_ptr<Operator> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule) {
         llvm::Type *IntegerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
 
         std::unordered_map<std::string, llvm::Function *> functionMap;
@@ -148,7 +146,7 @@ namespace {
     }
 
     template<typename TNumber>
-    class IRGenerator : public OperatorVisitor<TNumber> {
+    class IRGenerator : public OperatorVisitor {
     public:
         llvm::LLVMContext *context;
         llvm::IRBuilder<> *builder;
@@ -159,30 +157,26 @@ namespace {
         IRGenerator(llvm::LLVMContext *context, llvm::IRBuilder<> *builder, llvm::Function *function, const std::unordered_map<std::string, llvm::Function *> &functionMap)
             : context(context), builder(builder), function(function), functionMap(functionMap) {}
 
-        virtual void Visit(const ZeroOperator<TNumber> &op) override {
+        virtual void Visit(const ZeroOperator &op) override {
             value = builder->getIntN(IntegerBits<TNumber>, 0);
         }
 
-        virtual void Visit(const PreComputedOperator<TNumber> &op) override {
-            value = builder->getIntN(IntegerBits<TNumber>, op.GetValue());
-        }
-
-        virtual void Visit(const ArgumentOperator<TNumber> &op) override {
+        virtual void Visit(const ArgumentOperator &op) override {
             value = &function->arg_begin()[op.GetIndex()];
         }
 
-        virtual void Visit(const DefineOperator<TNumber> &op) override {
+        virtual void Visit(const DefineOperator &op) override {
             value = builder->getIntN(IntegerBits<TNumber>, 0);
         }
 
-        virtual void Visit(const ParenthesisOperator<TNumber> &op) override {
+        virtual void Visit(const ParenthesisOperator &op) override {
             value = builder->getIntN(IntegerBits<TNumber>, 0);
             for (auto& item : op.GetOperators()) {
                 item->Accept(*this);
             }
         }
 
-        virtual void Visit(const DecimalOperator<TNumber> &op) override {
+        virtual void Visit(const DecimalOperator &op) override {
             op.GetOperand()->Accept(*this);
             auto operand = value;
 
@@ -190,7 +184,7 @@ namespace {
             value = builder->CreateAdd(multed, builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
         }
 
-        virtual void Visit(const BinaryOperator<TNumber> &op) override {
+        virtual void Visit(const BinaryOperator &op) override {
             op.GetLeft()->Accept(*this);
             auto left = value;
             op.GetRight()->Accept(*this);
@@ -254,7 +248,7 @@ namespace {
             }
         }
 
-        virtual void Visit(const ConditionalOperator<TNumber> &op) override {
+        virtual void Visit(const ConditionalOperator &op) override {
             llvm::Value *temp = builder->CreateAlloca(builder->getIntNTy(IntegerBits<TNumber>));
             op.GetCondition()->Accept(*this);
             auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits<TNumber>, 0)), builder->getInt1(1), builder->getInt1(0));
@@ -283,7 +277,7 @@ namespace {
             value = builder->CreateLoad(temp);
         }
 
-        virtual void Visit(const UserDefinedOperator<TNumber> &op) override {
+        virtual void Visit(const UserDefinedOperator &op) override {
             std::vector<llvm::Value *> arguments(op.GetOperands().size());
             auto operands = op.GetOperands();
             for (size_t i = 0; i < operands.size(); i++) {
