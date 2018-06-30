@@ -33,7 +33,7 @@
 //InstantiationRunByJIT(int16_t);
 InstantiationRunByJIT(int32_t);
 InstantiationRunByJIT(int64_t);
-//InstantiationRunByJIT(__int128_t);
+InstantiationRunByJIT(__int128_t);
 
 namespace {
     constexpr const char *MainFunctionName = "__Main__";
