@@ -225,13 +225,27 @@ void ReplCore(const std::string &line, const Option &option) {
 
 template<typename TNumber>
 void PrintTree(const Operator<TNumber> &op, int depth) {
-    for (int i = 0; i < depth * 4; i++) {
-        std::cout << ' ';
-    }
+    using namespace std;
 
-    std::cout << typeid(op).name() << std::endl;
+    auto PrintIndent = [depth]() {
+        for (int i = 0; i < depth; i++) {
+            cout << "  ";
+        }
+    };
+
+    PrintIndent();
+
+    cout << op.ToString() << endl;
     for (auto& operand : op.GetOperands()) {
         PrintTree(*operand, depth + 1);
+    }
+
+    if (auto parenthesis = dynamic_cast<const ParenthesisOperator<TNumber> *>(&op)) {
+        PrintIndent();
+        cout << "Contains:" << endl;
+        for (auto& op2 : parenthesis->GetOperators()) {
+            PrintTree(*op2, depth + 1);
+        }
     }
 }
 
