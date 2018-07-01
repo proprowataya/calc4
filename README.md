@@ -2,7 +2,7 @@
 
 Calc4 is a programming language where everything in its code is an operator.
 
-First of all, see the sample codes below.
+First of all, see [the sample codes](https://github.com/proprowataya/calc4#sample-codes) below.
 
 ## Requirements
 
