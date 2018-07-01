@@ -81,16 +81,16 @@ namespace {
 
                     if (result != test.expected) {
                         cout
-                            << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")"
-                            << "    Expected: " << test.expected << ", Result: " << result << endl;
+                            << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")" << endl
+                            << "---> Expected: " << test.expected << ", Result: " << result << endl;
                         testResult.fail++;
                     } else {
                         testResult.success++;
                     }
                 } catch (std::string &error) {
                     cout
-                        << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")"
-                        << "    Exception \"" << error << "\"" << endl;
+                        << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")" << endl
+                        << "---> Exception \"" << error << "\"" << endl;
                     testResult.fail++;
                 }
             }

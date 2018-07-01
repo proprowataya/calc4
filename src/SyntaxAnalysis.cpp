@@ -319,7 +319,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
 
             if (auto argument = dynamic_cast<const ArgumentToken *>(ptr)) {
                 return std::make_shared<ArgumentOperator>(argument->GetIndex());
-            } else if (auto define = dynamic_cast<const DefineToken *>(ptr)) {
+            } else if (dynamic_cast<const DefineToken *>(ptr)) {
                 return std::make_shared<DefineOperator>();
             } else if (auto parentesis = dynamic_cast<const ParenthesisToken *>(ptr)) {
                 return Implement(parentesis->GetTokens(), context).Parse();
@@ -327,7 +327,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
                 return std::make_shared<DecimalOperator>(operands[0], decimal->GetValue());
             } else if (auto binary = dynamic_cast<const BinaryOperatorToken *>(ptr)) {
                 return std::make_shared<BinaryOperator>(operands[0], operands[1], binary->GetType());
-            } else if (auto conditional = dynamic_cast<const ConditionalOperatorToken *>(ptr)) {
+            } else if (dynamic_cast<const ConditionalOperatorToken *>(ptr)) {
                 return std::make_shared<ConditionalOperator>(operands[0], operands[1], operands[2]);
             } else if (auto userDefined = dynamic_cast<const UserDefinedOperatorToken *>(ptr)) {
                 return std::make_shared<UserDefinedOperator>(userDefined->GetDefinition(), operands);

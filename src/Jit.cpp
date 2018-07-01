@@ -74,7 +74,11 @@ TNumber RunByJIT(const CompilationContext &context, const std::shared_ptr<Operat
         PassManagerBuilder PMB;
         PMB.OptLevel = OptLevel;
         PMB.SizeLevel = SizeLevel;
+#if  __clang_major__ >= 5
         PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel, false);
+#else
+        PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel);
+#endif //  __clang_major__ >= 5
         PMB.populateFunctionPassManager(FPM);
         PMB.populateModulePassManager(PM);
 
@@ -93,15 +97,19 @@ TNumber RunByJIT(const CompilationContext &context, const std::shared_ptr<Operat
 
     // JIT
     EngineBuilder ebuilder(std::move(Owner));
-    std::string error = "No error";
+    std::string error;
     ebuilder.setErrorStr(&error).setEngineKind(EngineKind::Kind::JIT);
     ExecutionEngine *EE = ebuilder.create();
+
+    if (!error.empty()) {
+        throw error;
+    }
 
     // Call
     auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
 
-    if (printInfo) {
-        outs() << "Error: " << error << "\n";
+    if (!error.empty()) {
+        throw error;
     }
 
     TNumber result = func();
@@ -162,7 +170,12 @@ namespace {
         }
 
         virtual void Visit(const ArgumentOperator &op) override {
-            value = &function->arg_begin()[op.GetIndex()];
+            auto it = function->arg_begin();
+            for (int i = 0; i < op.GetIndex() - 1; i++) {
+                ++it;
+            }
+
+            value = &*it;
         }
 
         virtual void Visit(const DefineOperator &op) override {

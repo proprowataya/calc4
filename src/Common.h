@@ -10,8 +10,11 @@
 #define UNREACHABLE() __builtin_unreachable()
 #endif // _MSC_VER
 
-inline constexpr size_t SPRINTF_BUFFER_SIZE = 256;
-inline char sprintfBuffer[SPRINTF_BUFFER_SIZE];
+namespace {
+    constexpr size_t SPRINTF_BUFFER_SIZE = 256;
+}
+
+extern char sprintfBuffer[SPRINTF_BUFFER_SIZE];
 
 // Error messages
 namespace ErrorMessage {

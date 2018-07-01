@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "Operators.h"
 

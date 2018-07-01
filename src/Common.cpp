@@ -1,5 +1,7 @@
 #include "Common.h"
 
+char sprintfBuffer[SPRINTF_BUFFER_SIZE];
+
 std::vector<std::string> Split(const std::string &str, char c) {
     std::string::size_type begin = 0;
     std::vector<std::string> vec;
