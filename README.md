@@ -200,7 +200,7 @@ Let's take a look by using the next simple code.
     46
     ```
 
-This code is composed by two operators, "4" and "6". There is no token such as "46". The operator "6" takes one operand and returns "`(operand * 10) + 6`". The operator "4" is similar.
+This code is actually composed by two operators, "4" and "6". There is no token such as "46". The operator "6" takes one operand and returns ``(operand * 10) + 6``. Its operand is the result of the operator "4", which is similar.
 
 In other words, we can rewrite code 1 by the following C code.
 ```c
@@ -227,7 +227,8 @@ An AST (Abstract Syntax Tree) clarifies what I explained.
       DecimalOperator [Value = 4]
         ZeroOperator []
     ```
-    * To print AST, type "``#print on``" on the REPL.
+    * ``DecimalOperator [Value = 4]`` and ``DecimalOperator [Value = 6]`` stand for operator "4" and "6", respectively.
+    * To print AST, type ``#print on`` on the REPL.
 
 In this way, Calc4 represents every element as an operator.
 
@@ -303,4 +304,4 @@ attributes #0 = { nounwind readnone }
 ---------------------------
 ```
 
-Note that Calc4 executor does NOT always perform JIT compilation. It is limited when an operator has recursive call. You can force JIT compilation by running Calc4 with ``--always-jit`` option.
+Note that Calc4 executor does NOT always perform JIT compilation. By default, it is operated only when an operator has recursive call. You can force JIT compilation by running Calc4 with ``--always-jit`` option.
