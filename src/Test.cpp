@@ -66,6 +66,7 @@ namespace {
         for (auto& optimize : { true, false }) {
             for (auto& jit : { true, false }) {
                 try {
+                    cout << "Testing for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name() << ")" << endl;
                     CompilationContext context;
                     auto tokens = Lex(test.input, context);
                     auto op = Parse(tokens, context);
@@ -81,16 +82,15 @@ namespace {
 
                     if (result != test.expected) {
                         cout
-                            << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")" << endl
-                            << "---> Expected: " << test.expected << ", Result: " << result << endl;
+                            << "---> [Failed] Expected: " << test.expected << ", Result: " << result << endl;
                         testResult.fail++;
                     } else {
                         testResult.success++;
                     }
+                    cout << "---> [Success]" << endl;
                 } catch (std::string &error) {
                     cout
-                        << "Test failed for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ")" << endl
-                        << "---> Exception \"" << error << "\"" << endl;
+                        << "---> [Failed] Exception \"" << error << "\"" << endl;
                     testResult.fail++;
                 }
             }
