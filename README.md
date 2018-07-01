@@ -16,7 +16,7 @@ First of all, see [the sample codes](https://github.com/proprowataya/calc4#sampl
 
 ### Install Requirements
 
-The following commands are the steps to install requirements on Ubuntu.
+Steps to install requirements on Ubuntu:
 ```
 sudo apt update
 sudo apt install clang llvm llvm-dev zlib1g-dev make git
@@ -32,7 +32,7 @@ make
 
 ### Run
 
-Simply type ``calc4`` to run Calc4. Since Calc4 works as REPL, input what you want to evaluate.
+Simply type ``calc4`` to run Calc4. Calc4 works as REPL. Please input what you want to evaluate.
 ```
 $ ./calc4
 Calc4 REPL
@@ -120,7 +120,7 @@ Elapsed: 254.93 ms
 * Equivalent to
     ```c
     int fib(int n) {
-        return n <= 1 ? fib(n - 1) : fib(n - 2);
+        return n <= 1 ? n : fib(n - 1) + fib(n - 2);
     }
 
     return fib(38);
