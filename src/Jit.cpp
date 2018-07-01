@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/IR/Argument.h"
