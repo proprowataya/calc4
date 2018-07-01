@@ -75,11 +75,11 @@ TNumber RunByJIT(const CompilationContext &context, const std::shared_ptr<Operat
         PassManagerBuilder PMB;
         PMB.OptLevel = OptLevel;
         PMB.SizeLevel = SizeLevel;
-#if  __clang_major__ >= 5
+#if  LLVM_VERSION_MAJOR >= 5
         PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel, false);
 #else
         PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel);
-#endif //  __clang_major__ >= 5
+#endif //  LLVM_VERSION_MAJOR >= 5
         PMB.populateFunctionPassManager(FPM);
         PMB.populateModulePassManager(PM);
 
