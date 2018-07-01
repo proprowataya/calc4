@@ -129,11 +129,11 @@ namespace {
             std::vector<llvm::Type *> argumentTypes(definition.GetNumOperands());
             std::generate_n(argumentTypes.begin(), definition.GetNumOperands(), [&]() { return IntegerType; });
             llvm::FunctionType *functionType = llvm::FunctionType::get(IntegerType, argumentTypes, false);
-            functionMap[definition.GetName()] = llvm::cast<llvm::Function>(llvmModule->getOrInsertFunction(definition.GetName(), functionType));
+            functionMap[definition.GetName()] = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, definition.GetName(), llvmModule);
         }
 
-        llvm::Function *mainFunc = llvm::cast<llvm::Function>(
-            llvmModule->getOrInsertFunction(MainFunctionName, IntegerType));
+        llvm::FunctionType *funcType = llvm::FunctionType::get(IntegerType, {}, false);
+        llvm::Function *mainFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, MainFunctionName, llvmModule);
         {
             llvm::BasicBlock *mainBlock = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, mainFunc);
             llvm::IRBuilder<> builder(mainBlock);
