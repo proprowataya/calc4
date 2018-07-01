@@ -181,7 +181,12 @@ void ReplCore(const std::string &line, const Option &option) {
     using namespace llvm;
 
     CompilationContext context;
+
     auto tokens = Lex(line, context);
+    if (tokens.empty()) {
+        return;
+    }
+
     auto op = Parse(tokens, context);
     bool hasRecursiveCall = HasRecursiveCall(*op, context);
 
