@@ -171,7 +171,7 @@ namespace {
 
         virtual void Visit(const ArgumentOperator &op) override {
             auto it = function->arg_begin();
-            for (int i = 0; i < op.GetIndex() - 1; i++) {
+            for (int i = 0; i < op.GetIndex(); i++) {
                 ++it;
             }
 
