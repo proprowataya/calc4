@@ -1,6 +1,8 @@
 ﻿#include <iostream>
 #include <ctime>
 #include <cstdint>
+#include <limits>
+#include <gmpxx.h>
 #include "Operators.h"
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
@@ -8,6 +10,7 @@
 #include "Evaluator.h"
 
 constexpr const char *ProgramName = "Calc4 REPL";
+constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
 
 enum class ExecutionType {
     JIT, Interpreter,
@@ -32,6 +35,7 @@ namespace CommandLineArgs {
     constexpr const char *IntegerSizeShort = "-s";
     constexpr const char *EnableOptimization = "-O";
     constexpr const char *DisableOptimization = "-Od";
+    constexpr const char *InfinitePrecisionInteger = "inf";
 }
 
 inline bool StringEquals(const char *a, const char *b);
@@ -74,7 +78,12 @@ int main(int argc, char **argv) {
         } else if (StringEquals(str, CommandLineArgs::AlwaysJit) || StringEquals(str, CommandLineArgs::AlwaysJitShort)) {
             option.alwaysJit = true;
         } else if (StringEquals(str, CommandLineArgs::IntegerSize) || StringEquals(str, CommandLineArgs::IntegerSizeShort)) {
-            option.integerSize = atoi(GetNextArgument());
+            const char *arg = GetNextArgument();
+            if (StringEquals(arg, CommandLineArgs::InfinitePrecisionInteger)) {
+                option.integerSize = InfinitePrecisionIntegerSize;
+            } else {
+                option.integerSize = atoi(arg);
+            }
         } else if (StringEquals(str, CommandLineArgs::EnableOptimization)) {
             option.optimize = true;
         } else if (StringEquals(str, CommandLineArgs::DisableOptimization)) {
@@ -90,7 +99,7 @@ int main(int argc, char **argv) {
     // Print current setting
     if (!performTest) {
         cout
-            << "    Integer size: " << option.integerSize << endl
+            << "    Integer size: " << (option.integerSize == InfinitePrecisionIntegerSize ? "Infinite-precision" : std::to_string(option.integerSize)) << endl
             << "    Executor: " << GetExecutionTypeString(option.executionType) << endl
             << "    Always JIT: " << (option.alwaysJit ? "on" : "off") << endl
             << "    Optimize: " << (option.optimize ? "on" : "off") << endl
@@ -142,6 +151,9 @@ int main(int argc, char **argv) {
                 break;
             case 128:
                 ReplCore<__int128_t>(line, option);
+                break;
+            case InfinitePrecisionIntegerSize:
+                ReplCore<mpz_class>(line, option);
                 break;
             default:
                 sprintf(sprintfBuffer, "Unsupported integer size %d", option.integerSize);

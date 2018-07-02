@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdint>
+#include <gmpxx.h>
 #include "Operators.h"
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
@@ -49,6 +50,7 @@ void TestAll() {
         TestOne<int32_t>(test, result);
         TestOne<int64_t>(test, result);
         TestOne<__int128_t>(test, result);
+        TestOne<mpz_class>(test, result);
     }
 
     cout << "Test result" << endl
