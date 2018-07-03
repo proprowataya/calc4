@@ -8,6 +8,7 @@ First of all, see [the sample codes](https://github.com/proprowataya/calc4#sampl
 
 * [clang](https://clang.llvm.org/) (>= 3.8)
 * [LLVM](https://llvm.org/) (>= 3.8)
+* [GMP](https://gmplib.org/)
 * zlib
 * (make)
 * (git)
@@ -19,7 +20,7 @@ First of all, see [the sample codes](https://github.com/proprowataya/calc4#sampl
 Steps to install requirements on Ubuntu:
 ```
 sudo apt update
-sudo apt install clang llvm llvm-dev zlib1g-dev make git
+sudo apt install clang llvm llvm-dev libgmp-dev zlib1g-dev make git
 ```
 
 ### Build

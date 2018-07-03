@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdint>
+#include <gmpxx.h>
 #include "Operators.h"
 #include "SyntaxAnalysis.h"
 #include "Jit.h"
@@ -49,6 +50,7 @@ void TestAll() {
         TestOne<int32_t>(test, result);
         TestOne<int64_t>(test, result);
         TestOne<__int128_t>(test, result);
+        TestOne<mpz_class>(test, result);
     }
 
     cout << "Test result" << endl
@@ -66,6 +68,12 @@ namespace {
         for (auto& optimize : { true, false }) {
             for (auto& jit : { true, false }) {
                 try {
+                    if (std::is_same<TNumber, mpz_class>::value && jit) {
+                        // Jit compiler currently does not support infinite-precision integers.
+                        // So we skip this test case
+                        continue;
+                    }
+
                     cout << "Testing for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name() << ")" << endl;
                     CompilationContext context;
                     auto tokens = Lex(test.input, context);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gmpxx.h>
 #include "Operators.h"
 
 template<typename TNumber>
@@ -96,10 +97,11 @@ public:
     };
 
     virtual void Visit(const UserDefinedOperator &op) override {
-        TNumber *arg = STACK_ALLOC(TNumber, op.GetDefinition().GetNumOperands());
+        size_t size = op.GetDefinition().GetNumOperands();
+        TNumber *arg = std::is_same<TNumber, mpz_class>::value ? new TNumber[size] : STACK_ALLOC(TNumber, size);
 
         auto operands = op.GetOperands();
-        for (size_t i = 0; i < operands.size(); i++) {
+        for (size_t i = 0; i < size; i++) {
             operands[i]->Accept(*this);
             arg[i] = value;
         }
@@ -107,5 +109,9 @@ public:
         arguments.push(arg);
         context->GetOperatorImplement(op.GetDefinition().GetName()).GetOperator()->Accept(*this);
         arguments.pop();
+
+        if (std::is_same<TNumber, mpz_class>::value) {
+            delete[] arg;
+        }
     }
 };

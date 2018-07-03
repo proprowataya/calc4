@@ -2,6 +2,7 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <gmpxx.h>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -45,6 +46,11 @@ namespace {
 
     template<typename TNumber> void GenerateIR(const CompilationContext &context, const std::shared_ptr<Operator> &op, llvm::LLVMContext *llvmContext, llvm::Module *llvmModule);
     template<typename TNumber> class IRGenerator;
+}
+
+template<>
+mpz_class RunByJIT<mpz_class>(const CompilationContext &context, const std::shared_ptr<Operator> &op, bool optimize, bool printInfo) {
+    throw std::string("Infinite-precision integer is not currently supported");
 }
 
 template<typename TNumber>
