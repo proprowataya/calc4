@@ -39,6 +39,7 @@ namespace CommandLineArgs {
 }
 
 inline bool StringEquals(const char *a, const char *b);
+inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char **argv);
 template<typename TNumber> void ReplCore(const std::string &line, const Option &option);
 void PrintTree(const Operator &op, int depth);
@@ -66,30 +67,44 @@ int main(int argc, char **argv) {
             return argv[++i];
         };
 
-        if (StringEquals(str, CommandLineArgs::Help)) {
-            PrintHelp(argc, argv);
-            return 0;
-        } else if (StringEquals(str, CommandLineArgs::PerformTest)) {
-            performTest = true;
-        } else if (StringEquals(str, CommandLineArgs::EnableJit)) {
-            option.executionType = ExecutionType::JIT;
-        } else if (StringEquals(str, CommandLineArgs::DisableJit)) {
-            option.executionType = ExecutionType::Interpreter;
-        } else if (StringEquals(str, CommandLineArgs::AlwaysJit) || StringEquals(str, CommandLineArgs::AlwaysJitShort)) {
-            option.alwaysJit = true;
-        } else if (StringEquals(str, CommandLineArgs::IntegerSize) || StringEquals(str, CommandLineArgs::IntegerSizeShort)) {
-            const char *arg = GetNextArgument();
-            if (StringEquals(arg, CommandLineArgs::InfinitePrecisionInteger)) {
-                option.integerSize = InfinitePrecisionIntegerSize;
+        try {
+            if (StringEquals(str, CommandLineArgs::Help)) {
+                PrintHelp(argc, argv);
+                return 0;
+            } else if (StringEquals(str, CommandLineArgs::PerformTest)) {
+                performTest = true;
+            } else if (StringEquals(str, CommandLineArgs::EnableJit)) {
+                option.executionType = ExecutionType::JIT;
+            } else if (StringEquals(str, CommandLineArgs::DisableJit)) {
+                option.executionType = ExecutionType::Interpreter;
+            } else if (StringEquals(str, CommandLineArgs::AlwaysJit) || StringEquals(str, CommandLineArgs::AlwaysJitShort)) {
+                option.alwaysJit = true;
+            } else if (StringEquals(str, CommandLineArgs::IntegerSize) || StringEquals(str, CommandLineArgs::IntegerSizeShort)) {
+                const char *arg = GetNextArgument();
+                int size;
+
+                if (StringEquals(arg, CommandLineArgs::InfinitePrecisionInteger)) {
+                    size = (option.integerSize = InfinitePrecisionIntegerSize);
+                } else {
+                    size = (option.integerSize = atoi(arg));
+                }
+
+                if (!IsSupportedIntegerSize(size)) {
+                    sprintf(sprintfBuffer, "Unsupported integer size %d", option.integerSize);
+                    throw std::string(sprintfBuffer);
+                }
+            } else if (StringEquals(str, CommandLineArgs::EnableOptimization)) {
+                option.optimize = true;
+            } else if (StringEquals(str, CommandLineArgs::DisableOptimization)) {
+                option.optimize = false;
             } else {
-                option.integerSize = atoi(arg);
+                sprintf(sprintfBuffer, "Unknown option \"%s\"", str);
+                throw std::string(sprintfBuffer);
             }
-        } else if (StringEquals(str, CommandLineArgs::EnableOptimization)) {
-            option.optimize = true;
-        } else if (StringEquals(str, CommandLineArgs::DisableOptimization)) {
-            option.optimize = false;
-        } else {
-            sprintf(sprintfBuffer, "Unknown option \"%s\"", str);
+        } catch (std::string &error) {
+            cout << "Error: " << error << endl << endl;
+            PrintHelp(argc, argv);
+            return EXIT_FAILURE;
         }
     }
 
@@ -156,8 +171,8 @@ int main(int argc, char **argv) {
                 ReplCore<mpz_class>(line, option);
                 break;
             default:
-                sprintf(sprintfBuffer, "Unsupported integer size %d", option.integerSize);
-                throw std::string(sprintfBuffer);
+                UNREACHABLE();
+                break;
             }
         } catch (std::string &error) {
             cout << "Error: " << error << endl << endl;
@@ -171,20 +186,41 @@ inline bool StringEquals(const char *a, const char *b) {
     return strcmp(a, b) == 0;
 }
 
+inline bool IsSupportedIntegerSize(int size) {
+    switch (size) {
+    case 32:
+    case 64:
+    case 128:
+    case InfinitePrecisionIntegerSize:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void PrintHelp(int argc, char **argv) {
-    std::cout
+    using namespace std;
+    static constexpr const char *Indent = "    ";
+
+    cout
         << ProgramName << std::endl
         << std::endl
-        << "Options:"
-        << "    Help: --help" << std::endl
-        << "    EnableJit: --jit-on" << std::endl
-        << "    DisableJit: --jit-off" << std::endl
-        << "    AlwaysJit: --always-jit" << std::endl
-        << "    AlwaysJitShort: -a" << std::endl
-        << "    IntegerSize: --size" << std::endl
-        << "    IntegerSizeShort: -s" << std::endl
-        << "    EnableOptimization: -O" << std::endl
-        << "    DisableOptimization: -Od" << std::endl;
+        << "Options:" << endl
+        << CommandLineArgs::IntegerSize << "|" << CommandLineArgs::IntegerSizeShort << " <size>" << endl
+        << Indent << "Specify size of integer" << endl
+        << Indent << "size: 32, 64, 128, " << CommandLineArgs::InfinitePrecisionInteger << " (infinite-precision or arbitrary-precision)" << endl
+        << CommandLineArgs::EnableJit << endl
+        << Indent << "Enable JIT compilation" << endl
+        << CommandLineArgs::DisableJit << endl
+        << Indent << "Disable JIT compilation" << endl
+        << CommandLineArgs::AlwaysJit << "|" << CommandLineArgs::AlwaysJitShort << endl
+        << Indent << "Force JIT compilation" << endl
+        << CommandLineArgs::EnableOptimization << endl
+        << Indent << "Enable optimization" << endl
+        << CommandLineArgs::DisableOptimization << endl
+        << Indent << "Disable optimization" << endl
+        << CommandLineArgs::PerformTest << endl
+        << Indent << "Perform test" << endl;
 }
 
 template<typename TNumber>
@@ -226,7 +262,7 @@ void ReplCore(const std::string &line, const Option &option) {
     TNumber result;
     clock_t start = clock();
     {
-        if (option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
+        if (!std::is_same<TNumber, mpz_class>::value && option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
             result = RunByJIT<TNumber>(context, op, option.optimize, option.printInfo);
         } else {
             Evaluator<TNumber> eval(&context);

@@ -68,6 +68,12 @@ namespace {
         for (auto& optimize : { true, false }) {
             for (auto& jit : { true, false }) {
                 try {
+                    if (std::is_same<TNumber, mpz_class>::value && jit) {
+                        // Jit compiler currently does not support infinite-precision integers.
+                        // So we skip this test case
+                        continue;
+                    }
+
                     cout << "Testing for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name() << ")" << endl;
                     CompilationContext context;
                     auto tokens = Lex(test.input, context);
