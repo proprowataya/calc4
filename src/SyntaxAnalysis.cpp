@@ -219,8 +219,12 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             index++;
             size_t begin = index;
             size_t end = text.find_first_of(']', begin);
-            index = end + 1;
+            if (end == std::string::npos) {
+                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, "]");
+                throw std::string(snprintfBuffer);
+            }
 
+            index = end + 1;
             return text.substr(begin, end - begin);
         }
     };
