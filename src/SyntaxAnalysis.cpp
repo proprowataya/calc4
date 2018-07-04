@@ -70,8 +70,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             // Split supplementaryText into three strings
             std::vector<std::string> splitted = Split(supplementaryText, '|');
             if (splitted.size() != 3) {
-                sprintf(sprintfBuffer, ErrorMessage::DefinitionTextNotSplittedProperly, supplementaryText.c_str());
-                throw std::string(sprintfBuffer);
+                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::DefinitionTextNotSplittedProperly, supplementaryText.c_str());
+                throw std::string(snprintfBuffer);
             }
 
             // Split arguments
@@ -106,8 +106,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             size_t begin = index;
             size_t end = text.find_first_of('}', begin);
             if (end == std::string::npos) {
-                sprintf(sprintfBuffer, ErrorMessage::TokenExpected, "}");
-                throw std::string(sprintfBuffer);
+                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, "}");
+                throw std::string(snprintfBuffer);
             }
 
             std::string name = text.substr(begin, end - begin);
@@ -121,8 +121,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    sprintf(sprintfBuffer, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
-                    throw std::string(sprintfBuffer);
+                    snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
+                    throw std::string(snprintfBuffer);
                 }
             }
         }
@@ -138,8 +138,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             index = implement.index;
 
             if (index >= text.length() || text[index] != ')') {
-                sprintf(sprintfBuffer, ErrorMessage::TokenExpected, ")");
-                throw std::string(sprintfBuffer);
+                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, ")");
+                throw std::string(snprintfBuffer);
             }
 
             index++;
@@ -205,8 +205,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    sprintf(sprintfBuffer, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
-                    throw std::string(sprintfBuffer);
+                    snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
+                    throw std::string(snprintfBuffer);
                 }
             }
         }
@@ -262,8 +262,8 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
                     if (!tokens.empty() && dynamic_cast<const DecimalToken *>(tokens.begin()->get()) != nullptr) {
                         operands.push_back(std::make_shared<ZeroOperator>());
                     } else {
-                        sprintf(sprintfBuffer, ErrorMessage::SomeOperandsMissing);
-                        throw std::string(sprintfBuffer);
+                        snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::SomeOperandsMissing);
+                        throw std::string(snprintfBuffer);
                     }
                 } else {
                     operands.push_back(Implement(lower, context).Parse());
@@ -276,8 +276,8 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
                     while (operands.size() < static_cast<size_t>(maxNumOperands)) {
                         auto lower = ReadLower();
                         if (lower.empty()) {
-                            sprintf(sprintfBuffer, ErrorMessage::SomeOperandsMissing);
-                            throw std::string(sprintfBuffer);
+                            snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::SomeOperandsMissing);
+                            throw std::string(snprintfBuffer);
                         }
 
                         operands.push_back(Implement(lower, context).Parse());

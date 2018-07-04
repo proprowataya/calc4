@@ -11,10 +11,10 @@
 #endif // _MSC_VER
 
 namespace {
-    constexpr size_t SPRINTF_BUFFER_SIZE = 256;
+    constexpr size_t SnprintfBufferSize = 512;
 }
 
-extern char sprintfBuffer[SPRINTF_BUFFER_SIZE];
+extern char snprintfBuffer[SnprintfBufferSize];
 
 // Error messages
 namespace ErrorMessage {

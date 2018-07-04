@@ -1,6 +1,6 @@
 #include "Common.h"
 
-char sprintfBuffer[SPRINTF_BUFFER_SIZE];
+char snprintfBuffer[SnprintfBufferSize];
 
 std::vector<std::string> Split(const std::string &str, char c) {
     std::string::size_type begin = 0;

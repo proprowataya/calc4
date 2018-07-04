@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
 
         auto GetNextArgument = [&i, argc, argv]() {
             if (i + 1 >= argc) {
-                sprintf(sprintfBuffer, "Option \"%s\" requires argument", argv[i]);
-                throw std::string(sprintfBuffer);
+                snprintf(snprintfBuffer, SnprintfBufferSize, "Option \"%s\" requires argument", argv[i]);
+                throw std::string(snprintfBuffer);
             }
 
             return argv[++i];
@@ -90,16 +90,16 @@ int main(int argc, char **argv) {
                 }
 
                 if (!IsSupportedIntegerSize(size)) {
-                    sprintf(sprintfBuffer, "Unsupported integer size %d", option.integerSize);
-                    throw std::string(sprintfBuffer);
+                    snprintf(snprintfBuffer, SnprintfBufferSize, "Unsupported integer size %d", option.integerSize);
+                    throw std::string(snprintfBuffer);
                 }
             } else if (StringEquals(str, CommandLineArgs::EnableOptimization)) {
                 option.optimize = true;
             } else if (StringEquals(str, CommandLineArgs::DisableOptimization)) {
                 option.optimize = false;
             } else {
-                sprintf(sprintfBuffer, "Unknown option \"%s\"", str);
-                throw std::string(sprintfBuffer);
+                snprintf(snprintfBuffer, SnprintfBufferSize, "Unknown option \"%s\"", str);
+                throw std::string(snprintfBuffer);
             }
         } catch (std::string &error) {
             cout << "Error: " << error << endl << endl;
