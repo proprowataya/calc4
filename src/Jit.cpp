@@ -176,7 +176,7 @@ namespace {
             value = builder->getIntN(IntegerBits<TNumber>, 0);
         }
 
-        virtual void Visit(const ArgumentOperator &op) override {
+        virtual void Visit(const OperandOperator &op) override {
             auto it = function->arg_begin();
             for (int i = 0; i < op.GetIndex(); i++) {
                 ++it;

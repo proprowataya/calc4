@@ -13,7 +13,7 @@
 
 class Operator;
 class ZeroOperator;
-class ArgumentOperator;
+class OperandOperator;
 class DefineOperator;
 class ParenthesisOperator;
 class DecimalOperator;
@@ -26,7 +26,7 @@ class UserDefinedOperator;
 class OperatorVisitor {
 public:
     virtual void Visit(const ZeroOperator &op) = 0;
-    virtual void Visit(const ArgumentOperator &op) = 0;
+    virtual void Visit(const OperandOperator &op) = 0;
     virtual void Visit(const DefineOperator &op) = 0;
     virtual void Visit(const ParenthesisOperator &op) = 0;
     virtual void Visit(const DecimalOperator &op) = 0;
@@ -135,12 +135,12 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class ArgumentOperator : public Operator {
+class OperandOperator : public Operator {
 private:
     int index;
 
 public:
-    ArgumentOperator(int index)
+    OperandOperator(int index)
         : index(index) {}
 
     int GetIndex() const {
@@ -148,7 +148,7 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "ArgumentOperator [Index = %d]", index);
+        snprintf(snprintfBuffer, SnprintfBufferSize, "OperandOperator [Index = %d]", index);
         return std::string(snprintfBuffer);
     }
 

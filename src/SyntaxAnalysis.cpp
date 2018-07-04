@@ -318,7 +318,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
             auto ptr = token.get();
 
             if (auto argument = dynamic_cast<const ArgumentToken *>(ptr)) {
-                return std::make_shared<ArgumentOperator>(argument->GetIndex());
+                return std::make_shared<OperandOperator>(argument->GetIndex());
             } else if (dynamic_cast<const DefineToken *>(ptr)) {
                 return std::make_shared<DefineOperator>();
             } else if (auto parentesis = dynamic_cast<const ParenthesisToken *>(ptr)) {

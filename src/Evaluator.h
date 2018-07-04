@@ -19,7 +19,7 @@ public:
         value = 0;
     }
 
-    virtual void Visit(const ArgumentOperator &op) override {
+    virtual void Visit(const OperandOperator &op) override {
         value = arguments.top()[op.GetIndex()];
     };
 
