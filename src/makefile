@@ -14,7 +14,7 @@ ifeq (${CONFIG}, DEBUG)
 endif
 
 DEPS = $(OBJS:%.o=%.d)
-CXX_FLAGS = -fexceptions -Wno-unused-command-line-argument -Wno-unknown-warning-option -MMD -MP -std=c++1z ${DEBUG_RELEASE_CXX_FLAGS}
+CXX_FLAGS = -fexceptions -Wno-unknown-warning-option -MMD -MP -std=c++1z ${DEBUG_RELEASE_CXX_FLAGS}
 
 ${PROGRAM}: ${OBJS}
 	${CXX} ${OBJS} -o ${PROGRAM} `${LLVM_CONFIG} --ldflags --libs --system-libs` ${CXX_FLAGS} -lgmpxx -lgmp
