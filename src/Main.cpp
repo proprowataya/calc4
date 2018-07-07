@@ -262,7 +262,7 @@ void ReplCore(const std::string &line, const Option &option) {
     TNumber result;
     clock_t start = clock();
     {
-        if (!std::is_same<TNumber, mpz_class>::value && option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
+        if (option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
             result = RunByJIT<TNumber>(context, op, option.optimize, option.printInfo);
         } else {
             Evaluator<TNumber> eval(&context);
