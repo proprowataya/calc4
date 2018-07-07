@@ -161,7 +161,7 @@ namespace {
     }
 
     template<typename TNumber>
-    class IRGenerator : public OperatorVisitor {
+    class IRGeneratorBase : public OperatorVisitor {
     public:
         llvm::LLVMContext *context;
         llvm::IRBuilder<> *builder;
@@ -169,28 +169,34 @@ namespace {
         std::unordered_map<std::string, llvm::Function *> functionMap;
         llvm::Value *value;
 
-        IRGenerator(llvm::LLVMContext *context, llvm::IRBuilder<> *builder, llvm::Function *function, const std::unordered_map<std::string, llvm::Function *> &functionMap)
+        IRGeneratorBase(llvm::LLVMContext *context, llvm::IRBuilder<> *builder, llvm::Function *function, const std::unordered_map<std::string, llvm::Function *> &functionMap)
             : context(context), builder(builder), function(function), functionMap(functionMap) {}
+    };
+
+    template<typename TNumber>
+    class IRGenerator : public IRGeneratorBase<TNumber> {
+    public:
+        using IRGeneratorBase<TNumber>::IRGeneratorBase;
 
         virtual void Visit(const ZeroOperator &op) override {
-            value = builder->getIntN(IntegerBits<TNumber>, 0);
+            this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
         }
 
         virtual void Visit(const OperandOperator &op) override {
-            auto it = function->arg_begin();
+            auto it = this->function->arg_begin();
             for (int i = 0; i < op.GetIndex(); i++) {
                 ++it;
             }
 
-            value = &*it;
+            this->value = &*it;
         }
 
         virtual void Visit(const DefineOperator &op) override {
-            value = builder->getIntN(IntegerBits<TNumber>, 0);
+            this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
         }
 
         virtual void Visit(const ParenthesisOperator &op) override {
-            value = builder->getIntN(IntegerBits<TNumber>, 0);
+            this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
             for (auto& item : op.GetOperators()) {
                 item->Accept(*this);
             }
@@ -198,68 +204,68 @@ namespace {
 
         virtual void Visit(const DecimalOperator &op) override {
             op.GetOperand()->Accept(*this);
-            auto operand = value;
+            auto operand = this->value;
 
-            auto multed = builder->CreateMul(operand, builder->getIntN(IntegerBits<TNumber>, 10));
-            value = builder->CreateAdd(multed, builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
+            auto multed = this->builder->CreateMul(operand, this->builder->getIntN(IntegerBits<TNumber>, 10));
+            this->value = this->builder->CreateAdd(multed, this->builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
         }
 
         virtual void Visit(const BinaryOperator &op) override {
             op.GetLeft()->Accept(*this);
-            auto left = value;
+            auto left = this->value;
             op.GetRight()->Accept(*this);
-            auto right = value;
+            auto right = this->value;
 
             switch (op.GetType()) {
             case BinaryType::Add:
-                value = builder->CreateAdd(left, right);
+                this->value = this->builder->CreateAdd(left, right);
                 break;
             case BinaryType::Sub:
-                value = builder->CreateSub(left, right);
+                this->value = this->builder->CreateSub(left, right);
                 break;
             case BinaryType::Mult:
-                value = builder->CreateMul(left, right);
+                this->value = this->builder->CreateMul(left, right);
                 break;
             case BinaryType::Div:
-                value = builder->CreateSDiv(left, right);
+                this->value = this->builder->CreateSDiv(left, right);
                 break;
             case BinaryType::Mod:
-                value = builder->CreateSRem(left, right);
+                this->value = this->builder->CreateSRem(left, right);
                 break;
             case BinaryType::Equal:
             {
-                auto cmp = builder->CreateICmpEQ(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpEQ(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             case BinaryType::NotEqual:
             {
-                auto cmp = builder->CreateICmpNE(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpNE(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             case BinaryType::LessThan:
             {
-                auto cmp = builder->CreateICmpSLT(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpSLT(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             case BinaryType::LessThanOrEqual:
             {
-                auto cmp = builder->CreateICmpSLE(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpSLE(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             case BinaryType::GreaterThanOrEqual:
             {
-                auto cmp = builder->CreateICmpSGE(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpSGE(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             case BinaryType::GreaterThan:
             {
-                auto cmp = builder->CreateICmpSGT(left, right);
-                value = builder->CreateSelect(cmp, builder->getIntN(IntegerBits<TNumber>, 1), builder->getIntN(IntegerBits<TNumber>, 0));
+                auto cmp = this->builder->CreateICmpSGT(left, right);
+                this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
                 break;
             }
             default:
@@ -269,32 +275,32 @@ namespace {
         }
 
         virtual void Visit(const ConditionalOperator &op) override {
-            llvm::Value *temp = builder->CreateAlloca(builder->getIntNTy(IntegerBits<TNumber>));
+            llvm::Value *temp = this->builder->CreateAlloca(this->builder->getIntNTy(IntegerBits<TNumber>));
             op.GetCondition()->Accept(*this);
-            auto cond = builder->CreateSelect(builder->CreateICmpNE(value, builder->getIntN(IntegerBits<TNumber>, 0)), builder->getInt1(1), builder->getInt1(0));
-            auto oldBuilder = builder;
+            auto cond = this->builder->CreateSelect(this->builder->CreateICmpNE(this->value, this->builder->getIntN(IntegerBits<TNumber>, 0)), this->builder->getInt1(1), this->builder->getInt1(0));
+            auto oldBuilder = this->builder;
 
-            llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*context, "", function);
+            llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*this->context, "", this->function);
             llvm::IRBuilder<> ifTrueBuilder(ifTrue);
-            IRGenerator<TNumber> ifTrueGenerator(context, &ifTrueBuilder, function, functionMap);
+            IRGenerator<TNumber> ifTrueGenerator(this->context, &ifTrueBuilder, this->function, this->functionMap);
             op.GetIfTrue()->Accept(ifTrueGenerator);
-            builder = ifTrueGenerator.builder;
-            builder->CreateStore(ifTrueGenerator.value, temp);
+            this->builder = ifTrueGenerator.builder;
+            this->builder->CreateStore(ifTrueGenerator.value, temp);
 
-            llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*context, "", function);
+            llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*this->context, "", this->function);
             llvm::IRBuilder<> ifFalseBuilder(ifFalse);
-            IRGenerator<TNumber> ifFalseGenerator(context, &ifFalseBuilder, function, functionMap);
+            IRGenerator<TNumber> ifFalseGenerator(this->context, &ifFalseBuilder, this->function, this->functionMap);
             op.GetIfFalse()->Accept(ifFalseGenerator);
-            builder = ifFalseGenerator.builder;
-            builder->CreateStore(ifFalseGenerator.value, temp);
+            this->builder = ifFalseGenerator.builder;
+            this->builder->CreateStore(ifFalseGenerator.value, temp);
 
-            llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*context, "", function);
-            builder = new llvm::IRBuilder<>(nextBlock);
+            llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*this->context, "", this->function);
+            this->builder = new llvm::IRBuilder<>(nextBlock);
 
             oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
             ifTrueGenerator.builder->CreateBr(nextBlock);
             ifFalseGenerator.builder->CreateBr(nextBlock);
-            value = builder->CreateLoad(temp);
+            this->value = this->builder->CreateLoad(temp);
         }
 
         virtual void Visit(const UserDefinedOperator &op) override {
@@ -302,10 +308,10 @@ namespace {
             auto operands = op.GetOperands();
             for (size_t i = 0; i < operands.size(); i++) {
                 operands[i]->Accept(*this);
-                arguments[i] = value;
+                arguments[i] = this->value;
             }
 
-            value = builder->CreateCall(functionMap[op.GetDefinition().GetName()], arguments);
+            this->value = this->builder->CreateCall(this->functionMap[op.GetDefinition().GetName()], arguments);
         }
     };
 }
