@@ -146,6 +146,8 @@ namespace {
                 "__mpz_struct");
         llvm::Type *mpzIntType = llvm::ArrayType::get(mpzStructType, 1);
         llvm::Type *mpzPtrType = llvm::PointerType::getUnqual(mpzStructType);
+        llvm::Type *voidType = llvm::Type::getVoidTy(*this->context);
+        llvm::Type *int32Type = llvm::Type::getInt32Ty(*this->context);
 
         GMPFunctions() {}
 
@@ -153,24 +155,26 @@ namespace {
             : GMPFunctionsBase(context, module) {}
 
 #define STR(X) #X
-#define DECLARE_FUNCTION(NAME, ...) \
+#define DECLARE_FUNCTION(NAME, RETURN_TYPE, ...) \
         llvm::Function *llvm_ ## NAME = llvm::Function::Create( \
-            llvm::FunctionType::get(llvm::Type::getVoidTy(*this->context), { __VA_ARGS__ }, false), \
-            llvm::Function::ExternalLinkage, STR(__g ## NAME)  , this->module)
+            llvm::FunctionType::get(RETURN_TYPE, { __VA_ARGS__ }, false), \
+            llvm::Function::ExternalLinkage, STR(__g ## NAME), this->module)
 
-        DECLARE_FUNCTION(mpz_init, mpzPtrType);
-        DECLARE_FUNCTION(mpz_set, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_init_set, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_set_si, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
-        DECLARE_FUNCTION(mpz_clear, mpzPtrType);
+        DECLARE_FUNCTION(mpz_init, voidType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_set, voidType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_init_set, voidType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_set_si, voidType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
+        DECLARE_FUNCTION(mpz_clear, voidType, mpzPtrType);
 
-        DECLARE_FUNCTION(mpz_add, mpzPtrType, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_add_ui, mpzPtrType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
-        DECLARE_FUNCTION(mpz_sub, mpzPtrType, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_mul, mpzPtrType, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_mul_si, mpzPtrType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
-        DECLARE_FUNCTION(mpz_tdiv_q, mpzPtrType, mpzPtrType, mpzPtrType);
-        DECLARE_FUNCTION(mpz_tdiv_r, mpzPtrType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_add, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_add_ui, voidType, mpzPtrType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
+        DECLARE_FUNCTION(mpz_sub, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_mul, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_mul_si, voidType, mpzPtrType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
+        DECLARE_FUNCTION(mpz_tdiv_q, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
+        DECLARE_FUNCTION(mpz_tdiv_r, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
+
+        DECLARE_FUNCTION(mpz_cmp, int32Type, mpzPtrType, mpzPtrType);
 
         llvm::Function *mallocfunc = llvm::Function::Create(
             llvm::FunctionType::get(llvm::Type::getInt64PtrTy(*this->context), { llvm::Type::getInt64Ty(*this->context) }, false),
@@ -399,11 +403,10 @@ namespace {
 
     template<>
     class IRGenerator<__mpz_struct *> : public IRGeneratorBase<__mpz_struct *> {
-    private:
+    public:
         /* GMP Variable */
         llvm::Value *localValue;
 
-    public:
         using IRGeneratorBase<__mpz_struct *>::IRGeneratorBase;
 
         virtual void BeginFunction() override {
@@ -485,42 +488,44 @@ namespace {
             case BinaryType::Mod:
                 this->builder->CreateCall(gmp->llvm_mpz_tdiv_r, { GetValuePtr(), GetValuePtr(temp), GetValuePtr() });
                 break;
-                //case BinaryType::Equal:
-                //{
-                //    auto cmp = this->builder->CreateICmpEQ(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
-                //case BinaryType::NotEqual:
-                //{
-                //    auto cmp = this->builder->CreateICmpNE(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
-                //case BinaryType::LessThan:
-                //{
-                //    auto cmp = this->builder->CreateICmpSLT(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
-                //case BinaryType::LessThanOrEqual:
-                //{
-                //    auto cmp = this->builder->CreateICmpSLE(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
-                //case BinaryType::GreaterThanOrEqual:
-                //{
-                //    auto cmp = this->builder->CreateICmpSGE(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
-                //case BinaryType::GreaterThan:
-                //{
-                //    auto cmp = this->builder->CreateICmpSGT(left, right);
-                //    this->value = this->builder->CreateSelect(cmp, this->builder->getIntN(IntegerBits<TNumber>, 1), this->builder->getIntN(IntegerBits<TNumber>, 0));
-                //    break;
-                //}
+            case BinaryType::Equal:
+            case BinaryType::NotEqual:
+            case BinaryType::LessThan:
+            case BinaryType::LessThanOrEqual:
+            case BinaryType::GreaterThanOrEqual:
+            case BinaryType::GreaterThan:
+            {
+                llvm::Value *gmpcmp = this->builder->CreateCall(gmp->llvm_mpz_cmp, { GetValuePtr(temp), GetValuePtr() });
+
+                llvm::Value *cmp;
+                switch (op.GetType()) {
+                case BinaryType::Equal:
+                    cmp = this->builder->CreateICmpEQ(gmpcmp, this->builder->getInt32(0));
+                    break;
+                case BinaryType::NotEqual:
+                    cmp = this->builder->CreateICmpNE(gmpcmp, this->builder->getInt32(0));
+                    break;
+                case BinaryType::LessThan:
+                    cmp = this->builder->CreateICmpSLT(gmpcmp, this->builder->getInt32(0));
+                    break;
+                case BinaryType::LessThanOrEqual:
+                    cmp = this->builder->CreateICmpSLE(gmpcmp, this->builder->getInt32(0));
+                    break;
+                case BinaryType::GreaterThanOrEqual:
+                    cmp = this->builder->CreateICmpSGE(gmpcmp, this->builder->getInt32(0));
+                    break;
+                case BinaryType::GreaterThan:
+                    cmp = this->builder->CreateICmpSGT(gmpcmp, this->builder->getInt32(0));
+                    break;
+                default:
+                    UNREACHABLE();
+                    break;
+                }
+
+                llvm::Value *result = this->builder->CreateSelect(cmp, this->builder->getInt32(1), this->builder->getInt32(0));
+                this->builder->CreateCall(gmp->llvm_mpz_set_si, { GetValuePtr(), result });
+                break;
+            }
             default:
                 UNREACHABLE();
                 break;
@@ -531,43 +536,76 @@ namespace {
         }
 
         virtual void Visit(const ConditionalOperator &op) override {
-            //llvm::Value *temp = this->builder->CreateAlloca(this->builder->getIntNTy(IntegerBits<TNumber>));
-            //op.GetCondition()->Accept(*this);
-            //auto cond = this->builder->CreateSelect(this->builder->CreateICmpNE(this->value, this->builder->getIntN(IntegerBits<TNumber>, 0)), this->builder->getInt1(1), this->builder->getInt1(0));
-            //auto oldBuilder = this->builder;
+            /* ***** Evaluate condition expression ***** */
+            /*
+                The structure of __mpz_struct is as follows:
+                    typedef struct {
+                        int _mp_alloc;
+                        int _mp_size;
+                        mp_limb_t *_mp_d;
+                    } __mpz_struct;
+                We can determine whether the value is zero by looking at '_mp_size' member.
+            */
+            op.GetCondition()->Accept(*this);
+            llvm::Value *casted = this->builder->CreateBitCast(GetValuePtr(), llvm::PointerType::get(llvm::Type::getInt32Ty(*this->context), 0));
+            llvm::Value *ptr = this->builder->CreateInBoundsGEP(casted, this->builder->getInt32(1));
+            llvm::Value *sign = this->builder->CreateLoad(ptr);
+            llvm::Value *cond = this->builder->CreateSelect(
+                this->builder->CreateICmpNE(sign, this->builder->getInt32(0)),
+                this->builder->getInt1(1), this->builder->getInt1(0));
 
-            //llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*this->context, "", this->function);
-            //llvm::IRBuilder<> ifTrueBuilder(ifTrue);
-            //IRGenerator<TNumber> ifTrueGenerator(this->context, &ifTrueBuilder, this->function, this->functionMap);
-            //op.GetIfTrue()->Accept(ifTrueGenerator);
-            //this->builder = ifTrueGenerator.builder;
-            //this->builder->CreateStore(ifTrueGenerator.value, temp);
+            /* ***** Generate if-true and if-false codes ***** */
+            llvm::IRBuilder<> *oldBuilder = this->builder;
+            auto Core = [this](llvm::BasicBlock *block, const std::shared_ptr<Operator> &op) {
+                auto builder = new llvm::IRBuilder<>(block);
+                IRGenerator<__mpz_struct *> generator(this->module, this->context, builder, this->function, this->functionMap, this->gmp);
+                generator.localValue = localValue;
+                op->Accept(generator);
+                return (this->builder = generator.builder);
+            };
 
-            //llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*this->context, "", this->function);
-            //llvm::IRBuilder<> ifFalseBuilder(ifFalse);
-            //IRGenerator<TNumber> ifFalseGenerator(this->context, &ifFalseBuilder, this->function, this->functionMap);
-            //op.GetIfFalse()->Accept(ifFalseGenerator);
-            //this->builder = ifFalseGenerator.builder;
-            //this->builder->CreateStore(ifFalseGenerator.value, temp);
+            llvm::BasicBlock *ifTrue = llvm::BasicBlock::Create(*this->context, "", this->function);
+            auto ifTrueBuilder = Core(ifTrue, op.GetIfTrue());
+            llvm::BasicBlock *ifFalse = llvm::BasicBlock::Create(*this->context, "", this->function);
+            auto ifFalseBuilder = Core(ifFalse, op.GetIfFalse());
 
-            //llvm::BasicBlock *nextBlock = llvm::BasicBlock::Create(*this->context, "", this->function);
-            //this->builder = new llvm::IRBuilder<>(nextBlock);
+            /* ***** Emit branch operation ***** */
+            llvm::BasicBlock *finalBlock = llvm::BasicBlock::Create(*this->context, "", this->function);
+            this->builder = new llvm::IRBuilder<>(finalBlock);
 
-            //oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
-            //ifTrueGenerator.builder->CreateBr(nextBlock);
-            //ifFalseGenerator.builder->CreateBr(nextBlock);
-            //this->value = this->builder->CreateLoad(temp);
+            oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
+            ifTrueBuilder->CreateBr(finalBlock);
+            ifFalseBuilder->CreateBr(finalBlock);
         }
 
         virtual void Visit(const UserDefinedOperator &op) override {
-            //std::vector<llvm::Value *> arguments(op.GetOperands().size());
-            //auto operands = op.GetOperands();
-            //for (size_t i = 0; i < operands.size(); i++) {
-            //    operands[i]->Accept(*this);
-            //    arguments[i] = this->value;
-            //}
+            size_t numOperands = op.GetDefinition().GetNumOperands();
+            std::vector<llvm::Value *> params(numOperands);
 
-            //this->value = this->builder->CreateCall(this->functionMap[op.GetDefinition().GetName()], arguments);
+            /* ***** Allocate operands ***** */
+            for (size_t i = 0; i < numOperands; i++) {
+                llvm::Value *alloced = this->builder->CreateAlloca(gmp->mpzIntType);
+                params[i] = GetValuePtr(alloced);
+                this->builder->CreateCall(gmp->llvm_mpz_init, { params[i] });
+            }
+
+            /* ***** Evaluate operands ***** */
+            auto operands = op.GetOperands();
+            for (size_t i = 0; i < numOperands; i++) {
+                operands[i]->Accept(*this);
+                this->builder->CreateCall(gmp->llvm_mpz_set, { params[i], GetValuePtr() });
+            }
+
+            /* ***** Call user-defined operator ***** */
+            llvm::Value *result = this->builder->CreateCall(this->functionMap[op.GetDefinition().GetName()], params);
+
+            /* ***** Store the result ***** */
+            this->builder->CreateCall(gmp->llvm_mpz_set, { GetValuePtr(), result });
+
+            /* ***** Free operands ***** */
+            for (size_t i = 0; i < numOperands; i++) {
+                this->builder->CreateCall(gmp->llvm_mpz_clear, { params[i] });
+            }
         }
     };
 }
