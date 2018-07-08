@@ -179,6 +179,10 @@ namespace {
         llvm::Function *mallocfunc = llvm::Function::Create(
             llvm::FunctionType::get(llvm::Type::getInt64PtrTy(*this->context), { llvm::Type::getInt64Ty(*this->context) }, false),
             llvm::Function::ExternalLinkage, "malloc", this->module);
+
+        llvm::Function *freefunc = llvm::Function::Create(
+            llvm::FunctionType::get(voidType, { llvm::Type::getInt64Ty(*this->context) }, false),
+            llvm::Function::ExternalLinkage, "free", this->module);
     };
 
     template<typename TNumber>
@@ -601,6 +605,10 @@ namespace {
 
             /* ***** Store the result ***** */
             this->builder->CreateCall(gmp->llvm_mpz_set, { GetValuePtr(), result });
+
+            /* ***** Free allocated memory ***** */
+            this->builder->CreateCall(gmp->freefunc, { result });
+            this->builder->CreateCall(gmp->llvm_mpz_clear, { result });
 
             /* ***** Free operands ***** */
             for (size_t i = 0; i < numOperands; i++) {
