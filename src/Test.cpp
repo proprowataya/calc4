@@ -78,7 +78,7 @@ namespace {
 
                     TNumber result;
                     if (jit) {
-                        result = RunByJIT<TNumber>(context, op, optimize, false);
+                        result = EvaluateByJIT<TNumber>(context, op, optimize, false);
                     } else {
                         Evaluator<TNumber> eval(&context);
                         op->Accept(eval);
@@ -91,8 +91,8 @@ namespace {
                         testResult.fail++;
                     } else {
                         testResult.success++;
+                        cout << "---> [Success]" << endl;
                     }
-                    cout << "---> [Success]" << endl;
                 } catch (std::string &error) {
                     cout
                         << "---> [Failed] Exception \"" << error << "\"" << endl;

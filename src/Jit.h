@@ -6,4 +6,4 @@
 #include "Operators.h"
 
 template<typename TNumber>
-TNumber RunByJIT(const CompilationContext &context, const std::shared_ptr<Operator> &op, bool optimize, bool printInfo);
+TNumber EvaluateByJIT(const CompilationContext &context, const std::shared_ptr<Operator> &op, bool optimize, bool printInfo);
