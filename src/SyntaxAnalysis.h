@@ -21,6 +21,7 @@ class Token {
 public:
     virtual int GetNumOperands() const = 0;
     virtual const std::string &GetSupplementaryText() const = 0;
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const = 0;
     virtual ~Token() {}
 };
 
@@ -48,6 +49,10 @@ public:
 
     int GetIndex() const {
         return index;
+    }
+
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<OperandOperator>(index);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -81,6 +86,10 @@ public:
         return tokens;
     }
 
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<DefineOperator>();
+    }
+
     MAKE_GET_SUPPLEMENTARY_TEXT;
     MAKE_GET_NUM_OPERANDS(0)
 };
@@ -96,6 +105,10 @@ public:
 
     const std::vector<std::shared_ptr<Token>> GetTokens() const {
         return tokens;
+    }
+
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return Parse(tokens, context);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -115,6 +128,10 @@ public:
         return value;
     }
 
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<DecimalOperator>(operands[0], value);
+    }
+
     MAKE_GET_SUPPLEMENTARY_TEXT;
     MAKE_GET_NUM_OPERANDS(1)
 };
@@ -132,6 +149,10 @@ public:
         return type;
     }
 
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<BinaryOperator>(operands[0], operands[1], type);
+    }
+
     MAKE_GET_SUPPLEMENTARY_TEXT;
     MAKE_GET_NUM_OPERANDS(2)
 };
@@ -143,6 +164,10 @@ private:
 public:
     ConditionalOperatorToken(const std::string &supplementaryText)
         : supplementaryText(supplementaryText) {}
+
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<ConditionalOperator>(operands[0], operands[1], operands[2]);
+    }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
     MAKE_GET_NUM_OPERANDS(3)
@@ -159,6 +184,10 @@ public:
 
     const OperatorDefinition &GetDefinition() const {
         return definition;
+    }
+
+    virtual std::shared_ptr<Operator> CreateOperator(const std::vector<std::shared_ptr<Operator>> &operands, CompilationContext &context) const override {
+        return std::make_shared<UserDefinedOperator>(definition, operands);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;

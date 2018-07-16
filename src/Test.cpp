@@ -23,6 +23,9 @@ namespace {
         { "12345678", 12345678 },
         { "1+2*3", (1 + 2) * 3 },
         { "0?1?2?3?4", 3 },
+        { "1?(1?2?3)?4", 2 },
+        { "1?(0?2?3)?4", 3 },
+        { "0?(1?2?3)?4", 4 },
         { "D[add|x,y|x+y] 12{add}23", 12 + 23 },
         { "D[get12345||12345] {get12345}+{get12345}", 12345 + 12345 },
         { "D[fact|x,y|x==0?y?(x-1){fact}(x*y)] 10{fact}1", 3628800 },
@@ -68,12 +71,6 @@ namespace {
         for (auto& optimize : { true, false }) {
             for (auto& jit : { true, false }) {
                 try {
-                    if (std::is_same<TNumber, mpz_class>::value && jit) {
-                        // Jit compiler currently does not support infinite-precision integers.
-                        // So we skip this test case
-                        continue;
-                    }
-
                     cout << "Testing for \"" << test.input << "\" (optimize = " << (optimize ? "on" : "off") << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name() << ")" << endl;
                     CompilationContext context;
                     auto tokens = Lex(test.input, context);
@@ -81,7 +78,7 @@ namespace {
 
                     TNumber result;
                     if (jit) {
-                        result = RunByJIT<TNumber>(context, op, optimize, false);
+                        result = EvaluateByJIT<TNumber>(context, op, optimize, false);
                     } else {
                         Evaluator<TNumber> eval(&context);
                         op->Accept(eval);
@@ -94,8 +91,8 @@ namespace {
                         testResult.fail++;
                     } else {
                         testResult.success++;
+                        cout << "---> [Success]" << endl;
                     }
-                    cout << "---> [Success]" << endl;
                 } catch (std::string &error) {
                     cout
                         << "---> [Failed] Exception \"" << error << "\"" << endl;

@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     Option option;
     bool performTest = false;
 
-    // Parse command line args
+    /* ***** Parse command line args ***** */
     for (int i = 1; i < argc; i++) {
         char *str = argv[i];
 
@@ -108,10 +108,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Print header
+    /* ***** Print header ***** */
     cout << ProgramName << endl;
 
-    // Print current setting
+    /* ***** Print current setting ***** */
     if (!performTest) {
         cout
             << "    Integer size: " << (option.integerSize == InfinitePrecisionIntegerSize ? "Infinite-precision" : std::to_string(option.integerSize)) << endl
@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
             << endl;
     }
 
-    // Initialize LLVM if needed
+    /* ***** Initialize LLVM if needed ***** */
     if (performTest || option.executionType == ExecutionType::JIT) {
         LLVMInitializeNativeTarget();
         LLVMInitializeNativeAsmPrinter();
@@ -208,7 +208,7 @@ void PrintHelp(int argc, char **argv) {
         << "Options:" << endl
         << CommandLineArgs::IntegerSize << "|" << CommandLineArgs::IntegerSizeShort << " <size>" << endl
         << Indent << "Specify size of integer" << endl
-        << Indent << "size: 32, 64, 128, " << CommandLineArgs::InfinitePrecisionInteger << " (infinite-precision or arbitrary-precision)" << endl
+        << Indent << "size: 32, 64, 128, " << CommandLineArgs::InfinitePrecisionInteger << " (meaning infinite-precision or arbitrary-precision)" << endl
         << CommandLineArgs::EnableJit << endl
         << Indent << "Enable JIT compilation" << endl
         << CommandLineArgs::DisableJit << endl
@@ -231,10 +231,6 @@ void ReplCore(const std::string &line, const Option &option) {
     CompilationContext context;
 
     auto tokens = Lex(line, context);
-    if (tokens.empty()) {
-        return;
-    }
-
     auto op = Parse(tokens, context);
     bool hasRecursiveCall = HasRecursiveCall(*op, context);
 
@@ -262,8 +258,8 @@ void ReplCore(const std::string &line, const Option &option) {
     TNumber result;
     clock_t start = clock();
     {
-        if (!std::is_same<TNumber, mpz_class>::value && option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
-            result = RunByJIT<TNumber>(context, op, option.optimize, option.printInfo);
+        if (option.executionType == ExecutionType::JIT && (option.alwaysJit || HasRecursiveCall(*op, context))) {
+            result = EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo);
         } else {
             Evaluator<TNumber> eval(&context);
             op->Accept(eval);

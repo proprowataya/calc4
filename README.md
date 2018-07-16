@@ -260,6 +260,25 @@ Defining operators corresponds to creating new calculator buttons!
 
 So what is 4 in Calc4? [Hanc marginis exiguitas non caperet](https://en.wikipedia.org/wiki/Fermat%27s_Last_Theorem) :)
 
+## Infinite-precision (or arbitrary-precision) arithmetic and Turing completeness
+
+Calc4 supports infinite-precision (or arbitrary-precision) arithmetic, which is enabled by ``-s inf`` option. For example, you can compute even 1000th Fibonacci number.
+
+```
+$ ./calc4 -s inf
+Calc4 REPL
+    Integer size: Infinite-precision
+    Executor: JIT
+    Always JIT: off
+    Optimize: on
+
+> D[fib2|x, a, b|x ? ((x-1) ? ((x-1) {fib2} (a+b) {fib2}a) ? a) ? b] 1000{fib2}1{fib2}0
+43466557686937456435688527675040625802564660517371780402481729089536555417949051890403879840079255169295922593080322634775209689623239873322471161642996440906533187938298969649928516003704476137795166849228875
+Elapsed: 31.25 ms
+```
+
+This feature makes it possible to handle a sufficiently large memory space in Calc4. That is, we can treat a big integer as a memory. In this case, memory reads are expressed by a combination of multiplications and divisions. For memory writes, we further use additions and subtractions. I suppose infinite-precision arithmetic gives Turing completeness to Calc4 (please let me know if I'm wrong).
+
 ## Performance
 
 Calc4 has high performance, since its code is converted to machine code by the LLVM JIT compiler.
