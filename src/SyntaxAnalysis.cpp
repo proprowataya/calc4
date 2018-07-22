@@ -233,7 +233,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
         }
     };
 
-    Implement implement(text, context, {});
+    std::vector<std::string> emptyVector;
+    Implement implement(text, context, emptyVector);
     auto result = implement.Lex();
     if (implement.index < text.length()) {
         snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::UnexpectedToken, text[implement.index]);
