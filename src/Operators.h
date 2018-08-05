@@ -13,6 +13,7 @@
 
 class Operator;
 class ZeroOperator;
+class PrecomputedOperator;
 class OperandOperator;
 class DefineOperator;
 class ParenthesisOperator;
@@ -26,6 +27,7 @@ class UserDefinedOperator;
 class OperatorVisitor {
 public:
     virtual void Visit(const ZeroOperator &op) = 0;
+    virtual void Visit(const PrecomputedOperator &op) = 0;
     virtual void Visit(const OperandOperator &op) = 0;
     virtual void Visit(const DefineOperator &op) = 0;
     virtual void Visit(const ParenthesisOperator &op) = 0;
@@ -129,6 +131,29 @@ class ZeroOperator : public Operator {
 public:
     virtual std::string ToString() const override {
         return std::string("ZeroOperator []");
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS()
+};
+
+class PrecomputedOperator : public Operator {
+private:
+    AnyNumber value;
+
+public:
+    template<typename TNumber>
+    PrecomputedOperator(const TNumber &value)
+        : value(value) {}
+
+    template<typename TNumber>
+    const TNumber &GetValue() const {
+        return value.GetValue<TNumber>();
+    }
+
+    virtual std::string ToString() const override {
+        snprintf(snprintfBuffer, SnprintfBufferSize, "PrecomputedOperator [Value = %s]", value.ToString().c_str());
+        return std::string(snprintfBuffer);
     }
 
     MAKE_ACCEPT;
