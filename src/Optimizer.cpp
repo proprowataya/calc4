@@ -164,9 +164,18 @@ namespace {
 
 template<typename TNumber>
 std::shared_ptr<Operator> Optimize(CompilationContext &context, const std::shared_ptr<Operator> &op) {
-    Visitor<TNumber> visitor(context);
-    op->Accept(visitor);
-    return visitor.value;
+    auto OptimizeCore = [&context](const std::shared_ptr<Operator> &op) {
+        Visitor<TNumber> visitor(context);
+        op->Accept(visitor);
+        return visitor.value;
+    };
+
+    for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++) {
+        std::shared_ptr<Operator> optimized = OptimizeCore(it->second.GetOperator());
+        context.AddOperatorImplement(OperatorImplement(it->second.GetDefinition(), optimized));
+    }
+
+    return OptimizeCore(op);
 }
 
 template std::shared_ptr<Operator> Optimize<int32_t>(CompilationContext &context, const std::shared_ptr<Operator> &op);
