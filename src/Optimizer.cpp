@@ -156,8 +156,13 @@ namespace {
         };
 
         virtual void Visit(const UserDefinedOperator &op) override {
-            // TODO:
-            value = std::make_shared<UserDefinedOperator>(op.GetDefinition(), op.GetOperands());
+            std::vector<std::shared_ptr<Operator>> operands;
+
+            for (auto &op2 : op.GetOperands()) {
+                operands.push_back(Precompute(op2));
+            }
+
+            value = std::make_shared<UserDefinedOperator>(op.GetDefinition(), std::move(operands));
         };
     };
 }
