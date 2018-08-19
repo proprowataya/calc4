@@ -1,4 +1,5 @@
 ﻿#include <iostream>
+#include <sstream>
 #include <ctime>
 #include <cstdint>
 #include <limits>
@@ -60,8 +61,9 @@ int main(int argc, char **argv) {
 
         auto GetNextArgument = [&i, argc, argv]() {
             if (i + 1 >= argc) {
-                snprintf(snprintfBuffer, SnprintfBufferSize, "Option \"%s\" requires argument", argv[i]);
-                throw std::string(snprintfBuffer);
+                std::ostringstream oss;
+                oss << "Option \"" << argv[i] << "\" requires argument";
+                throw oss.str();
             }
 
             return argv[++i];
@@ -90,16 +92,18 @@ int main(int argc, char **argv) {
                 }
 
                 if (!IsSupportedIntegerSize(size)) {
-                    snprintf(snprintfBuffer, SnprintfBufferSize, "Unsupported integer size %d", option.integerSize);
-                    throw std::string(snprintfBuffer);
+                    std::ostringstream oss;
+                    oss << "Unsupported integer size " << option.integerSize;
+                    throw oss.str();
                 }
             } else if (StringEquals(str, CommandLineArgs::EnableOptimization)) {
                 option.optimize = true;
             } else if (StringEquals(str, CommandLineArgs::DisableOptimization)) {
                 option.optimize = false;
             } else {
-                snprintf(snprintfBuffer, SnprintfBufferSize, "Unknown option \"%s\"", str);
-                throw std::string(snprintfBuffer);
+                std::ostringstream oss;
+                oss << "Unknown option \"" << str << "\"";
+                throw oss.str();
             }
         } catch (std::string &error) {
             cout << "Error: " << error << endl << endl;

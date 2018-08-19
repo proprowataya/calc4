@@ -1,13 +1,43 @@
 #pragma once
 
+#include <string>
+#include <sstream>
+
 // Error messages
 namespace ErrorMessage {
-    static constexpr const char *OperatorOrOperandNotDefined = "Operator or operand \"%s\" is not defined";
-    static constexpr const char *DefinitionTextNotSplittedProperly = "The following definition text is not splitted by two '|'s: \"%s\"";
-    static constexpr const char *SomeOperandsMissing = "Some operand(s) is missing";
-    static constexpr const char *TokenExpected = "\"%s\" is expected";
-    static constexpr const char *UnexpectedToken = "Unexpected token \"%c\"";
-    static constexpr const char *CodeIsEmpty = "Code is empty";
+    static inline std::string OperatorOrOperandNotDefined(const std::string &name) {
+        std::ostringstream oss;
+        oss << "Operator or operand \"" << name << "\" is not defined";
+        return oss.str();
+    }
 
-    static constexpr const char *AssertionError = "Assertion error (this is a bug of compiler)";
+    static inline std::string DefinitionTextNotSplittedProperly(const std::string &text) {
+        std::ostringstream oss;
+        oss << "The following definition text is not splitted by two '|'s: \"" << text << "\"";
+        return oss.str();
+    }
+
+    static inline std::string SomeOperandsMissing() {
+        return "Some operand(s) is missing";
+    }
+
+    static inline std::string TokenExpected(const std::string &name) {
+        std::ostringstream oss;
+        oss << "\"" << name << "\" is expected";
+        return oss.str();
+    }
+
+    static inline std::string UnexpectedToken(char token) {
+        std::ostringstream oss;
+        oss << "Unexpected token \"" << token << "\"";
+        return oss.str();
+    }
+
+    static inline std::string CodeIsEmpty() {
+        return "Code is empty";
+    }
+
+    static inline std::string AssertionError() {
+        return "Assertion error (this is a bug of compiler)";
+    }
 }

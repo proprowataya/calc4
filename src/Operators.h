@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <sstream>
 #include <unordered_map>
 #include <stack>
 #include "Common.h"
@@ -128,7 +129,7 @@ public:
 class ZeroOperator : public Operator {
 public:
     virtual std::string ToString() const override {
-        return std::string("ZeroOperator []");
+        return "ZeroOperator []";
     }
 
     MAKE_ACCEPT;
@@ -148,8 +149,9 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "OperandOperator [Index = %d]", index);
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "OperandOperator [Index = " << index << "]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;
@@ -159,8 +161,7 @@ public:
 class DefineOperator : public Operator {
 public:
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "DefineOperator []");
-        return std::string(snprintfBuffer);
+        return "DefineOperator []";
     }
 
     MAKE_ACCEPT;
@@ -183,8 +184,9 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "ParenthesisOperator [%d operators]", static_cast<int>(operators.size()));
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "ParenthesisOperator [" << operators.size() << " operators]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;
@@ -209,8 +211,9 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "DecimalOperator [Value = %d]", value);
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "DecimalOperator [Value = " << value << "]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;
@@ -242,8 +245,9 @@ public:
 
     virtual std::string ToString() const override {
         static const char *BinaryTypeTable[] = { "Add", "Sub", "Mult", "Div", "Mod", "Equal", "NotEqual", "LessThan", "LessThanOrEqual", "GreaterThanOrEqual", "GreaterThan" };
-        snprintf(snprintfBuffer, SnprintfBufferSize, "BinaryOperator [Type = %s]", BinaryTypeTable[(size_t)type]);
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "BinaryOperator [Type = " << BinaryTypeTable[(size_t)type] << "]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;
@@ -271,8 +275,7 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "ConditionalOperator []");
-        return std::string(snprintfBuffer);
+        return "ConditionalOperator []";
     }
 
     MAKE_ACCEPT;
@@ -301,8 +304,9 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "UserDefinedOperator [Name = %s, NumOperands = %d]", definition.GetName().c_str(), definition.GetNumOperands());
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "UserDefinedOperator [Name = " << definition.GetName() << ", NumOperands = " << definition.GetNumOperands() << "]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;

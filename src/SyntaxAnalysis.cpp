@@ -69,8 +69,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             /* ***** Split supplementaryText into three strings ***** */
             std::vector<std::string> splitted = Split(supplementaryText, '|');
             if (splitted.size() != 3) {
-                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::DefinitionTextNotSplittedProperly, supplementaryText.c_str());
-                throw std::string(snprintfBuffer);
+                throw ErrorMessage::DefinitionTextNotSplittedProperly(supplementaryText);
             }
 
             /* ***** Split arguments ***** */
@@ -109,8 +108,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             size_t begin = index;
             size_t end = text.find_first_of('}', begin);
             if (end == std::string::npos) {
-                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, "}");
-                throw std::string(snprintfBuffer);
+                throw ErrorMessage::TokenExpected("}");
             }
 
             /* ***** Get identifier's name ***** */
@@ -131,8 +129,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
 
             /* ***** Ensure that text[index] == ')' ***** */
             if (index >= text.length() || text[index] != ')') {
-                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, ")");
-                throw std::string(snprintfBuffer);
+                throw ErrorMessage::TokenExpected(")");
             }
 
             index++;    // ')'
@@ -209,8 +206,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
                     int index = static_cast<int>(std::distance(arguments.begin(), it));
                     return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
                 } else {
-                    snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::OperatorOrOperandNotDefined, name.c_str());
-                    throw std::string(snprintfBuffer);
+                    throw ErrorMessage::OperatorOrOperandNotDefined(name);
                 }
             }
         }
@@ -224,8 +220,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
             size_t begin = index;
             size_t end = text.find_first_of(']', begin);
             if (end == std::string::npos) {
-                snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::TokenExpected, "]");
-                throw std::string(snprintfBuffer);
+                throw ErrorMessage::TokenExpected("]");
             }
 
             index = end + 1;
@@ -237,8 +232,7 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string &text, CompilationCont
     Implement implement(text, context, emptyVector);
     auto result = implement.Lex();
     if (implement.index < text.length()) {
-        snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::UnexpectedToken, text[implement.index]);
-        throw std::string(snprintfBuffer);
+        throw ErrorMessage::UnexpectedToken(text[implement.index]);
     }
 
     return result;
@@ -292,8 +286,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
                         operands.push_back(std::make_shared<ZeroOperator>());
                     } else {
                         // Otherwise, it is a syntax error
-                        snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::SomeOperandsMissing);
-                        throw std::string(snprintfBuffer);
+                        throw ErrorMessage::SomeOperandsMissing();
                     }
                 } else {
                     operands.push_back(Implement(lower, context).Parse());
@@ -307,8 +300,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
                     while (operands.size() < static_cast<size_t>(maxNumOperands)) {
                         auto lower = ReadLower();
                         if (lower.empty()) {
-                            snprintf(snprintfBuffer, SnprintfBufferSize, ErrorMessage::SomeOperandsMissing);
-                            throw std::string(snprintfBuffer);
+                            throw ErrorMessage::SomeOperandsMissing();
                         }
 
                         operands.push_back(Implement(lower, context).Parse());
@@ -327,7 +319,7 @@ std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>> &token
 
             switch (results.size()) {
             case 0:
-                throw std::string(ErrorMessage::CodeIsEmpty);
+                throw ErrorMessage::CodeIsEmpty();
             case 1:
                 return results[0];
             default:
