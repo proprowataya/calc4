@@ -153,8 +153,9 @@ public:
     }
 
     virtual std::string ToString() const override {
-        snprintf(snprintfBuffer, SnprintfBufferSize, "PrecomputedOperator [Value = %s]", value.ToString().c_str());
-        return std::string(snprintfBuffer);
+        std::ostringstream oss;
+        oss << "PrecomputedOperator [Value = " << value.ToString() << "]";
+        return oss.str();
     }
 
     MAKE_ACCEPT;
