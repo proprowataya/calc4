@@ -36,6 +36,7 @@ public:
     virtual void Visit(const BinaryOperator &op) = 0;
     virtual void Visit(const ConditionalOperator &op) = 0;
     virtual void Visit(const UserDefinedOperator &op) = 0;
+    virtual ~OperatorVisitor() = default;
 };
 
 /* ********** */
@@ -117,7 +118,7 @@ public:
     virtual void Accept(OperatorVisitor &visitor) const = 0;
     virtual std::vector<std::shared_ptr<Operator>> GetOperands() const = 0;
     virtual std::string ToString() const = 0;
-    virtual ~Operator() {}
+    virtual ~Operator() = default;
 };
 
 #define MAKE_ACCEPT virtual void Accept(OperatorVisitor &visitor) const override {\
