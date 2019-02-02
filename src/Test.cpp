@@ -6,6 +6,7 @@
 #include "Jit.h"
 #include "Test.h"
 #include "Evaluator.h"
+#include "Optimizer.h"
 
 namespace {
     struct TestCase {
@@ -75,6 +76,9 @@ namespace {
                     CompilationContext context;
                     auto tokens = Lex(test.input, context);
                     auto op = Parse(tokens, context);
+                    if (optimize) {
+                        op = Optimize<TNumber>(context, op);
+                    }
 
                     TNumber result;
                     if (jit) {

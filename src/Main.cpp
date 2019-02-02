@@ -9,6 +9,7 @@
 #include "Jit.h"
 #include "Test.h"
 #include "Evaluator.h"
+#include "Optimizer.h"
 
 constexpr const char *ProgramName = "Calc4 REPL";
 constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
@@ -236,6 +237,10 @@ void ReplCore(const std::string &line, const Option &option) {
 
     auto tokens = Lex(line, context);
     auto op = Parse(tokens, context);
+    if (option.optimize) {
+        op = Optimize<TNumber>(context, op);
+    }
+
     bool hasRecursiveCall = HasRecursiveCall(*op, context);
 
     if (option.printInfo) {

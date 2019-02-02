@@ -19,6 +19,10 @@ public:
         value = 0;
     }
 
+    virtual void Visit(const PrecomputedOperator &op) override {
+        value = op.GetValue<TNumber>();
+    }
+
     virtual void Visit(const OperandOperator &op) override {
         value = arguments.top()[op.GetIndex()];
     };

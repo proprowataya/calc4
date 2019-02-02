@@ -2,6 +2,7 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <sstream>
 #include <gmpxx.h>
 
 #include "llvm/ADT/STLExtras.h"
@@ -163,6 +164,7 @@ namespace {
         DECLARE_FUNCTION(mpz_set, voidType, mpzPtrType, mpzPtrType);
         DECLARE_FUNCTION(mpz_init_set, voidType, mpzPtrType, mpzPtrType);
         DECLARE_FUNCTION(mpz_set_si, voidType, mpzPtrType, llvm::Type::getInt32Ty(*this->context));
+        DECLARE_FUNCTION(mpz_set_str, int32Type, mpzPtrType, llvm::PointerType::get(llvm::Type::getInt8Ty(*this->context), 0), int32Type);
         DECLARE_FUNCTION(mpz_clear, voidType, mpzPtrType);
 
         DECLARE_FUNCTION(mpz_add, voidType, mpzPtrType, mpzPtrType, mpzPtrType);
@@ -284,6 +286,10 @@ namespace {
 
         virtual void Visit(const ZeroOperator &op) override {
             this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
+        }
+
+        virtual void Visit(const PrecomputedOperator &op) override {
+            this->value = this->builder->getIntN(IntegerBits<TNumber>, op.GetValue<TNumber>());
         }
 
         virtual void Visit(const OperandOperator &op) override {
@@ -468,6 +474,19 @@ namespace {
 
         virtual void Visit(const ZeroOperator &op) override {
             this->builder->CreateCall(gmp->llvm_mpz_set_si, { GetValuePtr(), this->builder->getInt32(0) });
+        }
+
+        virtual void Visit(const PrecomputedOperator &op) override {
+            mpz_class precomputed = op.GetValue<mpz_class>();
+            if (precomputed.fits_slong_p()) {
+                this->builder->CreateCall(gmp->llvm_mpz_set_si, { GetValuePtr(), this->builder->getInt32(precomputed.get_si()) });
+            } else {
+                std::stringstream ss;
+                ss << precomputed;
+                llvm::GlobalVariable *str = this->builder->CreateGlobalString(ss.str());
+                llvm::Value *strPtr = this->builder->CreateInBoundsGEP(str, { this->builder->getInt64(0) , this->builder->getInt64(0) });
+                this->builder->CreateCall(gmp->llvm_mpz_set_str, { GetValuePtr(), strPtr, this->builder->getInt32(10) });
+            }
         }
 
         virtual void Visit(const OperandOperator &op) override {
