@@ -135,21 +135,9 @@ namespace {
             std::shared_ptr<Operator> ifTrue = Precompute(op.GetIfTrue());
             std::shared_ptr<Operator> ifFalse = Precompute(op.GetIfFalse());
 
-            TNumber conditionValue, ifTrueValue, ifFalseValue;
+            TNumber conditionValue;
             if (TryGetPrecomputedValue(condition, &conditionValue)) {
-                if (conditionValue != 0) {
-                    if (TryGetPrecomputedValue(ifTrue, &ifTrueValue)) {
-                        value = std::make_shared<PrecomputedOperator>(ifTrueValue);
-                    } else {
-                        value = ifTrue;
-                    }
-                } else {
-                    if (TryGetPrecomputedValue(ifFalse, &ifFalseValue)) {
-                        value = std::make_shared<PrecomputedOperator>(ifFalseValue);
-                    } else {
-                        value = ifFalse;
-                    }
-                }
+                value = conditionValue != 0 ? ifTrue : ifFalse;
             } else {
                 value = std::make_shared<ConditionalOperator>(condition, ifTrue, ifFalse);
             }
