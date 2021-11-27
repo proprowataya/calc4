@@ -62,7 +62,7 @@ TNumber EvaluateByJIT(const CompilationContext &context, const std::shared_ptr<O
     LLVMContext Context;
 
     /* ***** Create module ***** */
-    std::unique_ptr<Module> Owner = make_unique<Module>("calc4-jit-module", Context);
+    std::unique_ptr<Module> Owner = std::make_unique<Module>("calc4-jit-module", Context);
     Module *M = Owner.get();
     M->setTargetTriple(LLVM_HOST_TRIPLE);
 
