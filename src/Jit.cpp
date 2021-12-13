@@ -357,6 +357,21 @@ public:
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     }
 
+    virtual void Visit(const LoadVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const LoadArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const PrintCharOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
     virtual void Visit(const ParenthesisOperator& op) override
     {
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
@@ -375,6 +390,16 @@ public:
             this->builder->CreateMul(operand, this->builder->getIntN(IntegerBits<TNumber>, 10));
         this->value = this->builder->CreateAdd(
             multed, this->builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
+    }
+
+    virtual void Visit(const StoreVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    }
+
+    virtual void Visit(const StoreArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
     }
 
     virtual void Visit(const BinaryOperator& op) override
@@ -618,6 +643,21 @@ public:
                                   { GetValuePtr(), this->builder->getInt32(0) });
     }
 
+    virtual void Visit(const LoadVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const LoadArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const PrintCharOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
     virtual void Visit(const ParenthesisOperator& op) override
     {
         this->builder->CreateCall(gmp->llvm_mpz_set_si,
@@ -636,6 +676,16 @@ public:
         this->builder->CreateCall(
             gmp->llvm_mpz_add_ui,
             { GetValuePtr(), GetValuePtr(), this->builder->getInt32(op.GetValue()) });
+    }
+
+    virtual void Visit(const StoreVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    }
+
+    virtual void Visit(const StoreArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
     }
 
     virtual void Visit(const BinaryOperator& op) override

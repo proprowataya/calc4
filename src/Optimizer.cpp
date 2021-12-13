@@ -57,6 +57,21 @@ public:
         value = std::make_shared<PrecomputedOperator>(static_cast<TNumber>(0));
     };
 
+    virtual void Visit(const LoadVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const LoadArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const PrintCharOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
     virtual void Visit(const ParenthesisOperator& op) override
     {
         std::vector<std::shared_ptr<Operator>> optimized;
@@ -97,6 +112,16 @@ public:
             value = std::make_shared<DecimalOperator>(precomputed, op.GetValue());
         }
     };
+
+    virtual void Visit(const StoreVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    }
+
+    virtual void Visit(const StoreArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
+    }
 
     virtual void Visit(const BinaryOperator& op) override
     {

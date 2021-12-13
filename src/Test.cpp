@@ -25,14 +25,24 @@ struct TestResult
 constexpr TestCase TestCases[] = {
     // clang-format off
     { "1<2", 1 },
+    { "1<=2", 1 },
+    { "1>=2", 0 },
+    { "1>2", 0 },
+    { "2<1", 0 },
+    { "2<=1", 0 },
+    { "2>=1", 1 },
+    { "2>1", 1 },
+    { "1<1", 0 },
+    { "1<=1", 1 },
+    { "1>=1", 1 },
+    { "1>1", 0 },
     { "12345678", 12345678 },
-    { "1+2*3", (1 + 2) * 3 },
+    { "1+2*3-10", -1 },
     { "0?1?2?3?4", 3 },
-    { "1?(1?2?3)?4", 2 },
-    { "1?(0?2?3)?4", 3 },
-    { "0?(1?2?3)?4", 4 },
-    { "D[add|x,y|x+y] 12{add}23", 12 + 23 },
-    { "D[get12345||12345] {get12345}+{get12345}", 12345 + 12345 },
+    { "72P101P108P108P111P10P", 0 },
+    { "D[print||72P101P108P108P111P10P] {print}", 0 },
+    { "D[add|x,y|x+y] 12{add}23", 35 },
+    { "D[get12345||12345] {get12345}+{get12345}", 24690 },
     { "D[fact|x,y|x==0?y?(x-1){fact}(x*y)] 10{fact}1", 3628800 },
 
     // Fibonacci
@@ -42,6 +52,39 @@ constexpr TestCase TestCases[] = {
 
     // Tarai
     { "D[tarai|x,y,z|x <= y ? y ? (((x - 1){tarai}y{tarai}z){tarai}((y - 1){tarai}z{tarai}x){tarai}((z - 1){tarai}x{tarai}y))] 10{tarai}5{tarai}5", 5 },
+
+    // User defined variables
+    { "1S", 1 },
+    { "L", 0 },
+    { "1S[var]", 1 },
+    { "L[var]", 0 },
+    { "D[get||L[var]] D[set|x|xS[var]] 123{set} {get} * {get}", 15129 },
+    { "D[set|x|xS] 7{set}L", 7 },
+    { "D[set|x|xS] 7{set}LS[var1] L[zero]3{set}LS[var2] L[var1]*L[var2]", 21 },
+    { "(123S)L*L", 15129 },
+    { "(123S[var])L[var]*L[var]", 15129 },
+    { "((100+20+3)S)L*L", 15129 },
+    { "((100+20+3)S[var])L[var]*L[var]", 15129 },
+    { "D[op||(123S)L*L]{op}", 15129 },
+    { "D[op||L*L](123S){op}", 15129 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}S)+L", 13530 },
+    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10?5)S {get}", 10 },
+    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10S?5S) {get}", 10 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 3{set} {fib2}", 2 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 20{set} {fib2}", 6765 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 3S {fib2}", 2 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 20S {fib2}", 6765 },
+    { "D[fib|n|10S(n<=1?n?((n-1){fib}+(n-2){fib}))S] 20{fib} L", 6765 },
+
+    // Array accesses
+    { "0@", 0 },
+    { "5->0", 5 },
+    { "(10->20)L[zero]20@", 10 },
+    { "((4+6)->(10+10))(20@)", 10 },
+    { "D[func||(10->20)L[zero]20@] {func} (20@)", 10 },
+    { "D[func||((4+6)->(10+10))(20@)] {func} (20@)", 10 },
+    { "D[func||(10->20)L[zero]20@] D[get||20@] {func} (20@)", 10 },
+    { "D[func||((4+6)->(10+10))(20@)] D[get||20@] {func} {get}", 10 },
     // clang-format on
 };
 
@@ -122,6 +165,11 @@ void TestOne(TestCase test, TestResult& testResult)
             catch (std::string& error)
             {
                 cout << "---> [Failed] Exception \"" << error << "\"" << endl;
+                testResult.fail++;
+            }
+            catch (std::exception& exception)
+            {
+                cout << "---> [Failed] Exception \"" << exception.what() << "\"" << endl;
                 testResult.fail++;
             }
         }

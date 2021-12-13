@@ -17,8 +17,13 @@ class ZeroOperator;
 class PrecomputedOperator;
 class OperandOperator;
 class DefineOperator;
+class LoadVariableOperator;
+class LoadArrayOperator;
+class PrintCharOperator;
 class ParenthesisOperator;
 class DecimalOperator;
+class StoreVariableOperator;
+class StoreArrayOperator;
 class BinaryOperator;
 class ConditionalOperator;
 class UserDefinedOperator;
@@ -32,8 +37,13 @@ public:
     virtual void Visit(const PrecomputedOperator& op) = 0;
     virtual void Visit(const OperandOperator& op) = 0;
     virtual void Visit(const DefineOperator& op) = 0;
+    virtual void Visit(const LoadVariableOperator& op) = 0;
+    virtual void Visit(const LoadArrayOperator& op) = 0;
+    virtual void Visit(const PrintCharOperator& op) = 0;
     virtual void Visit(const ParenthesisOperator& op) = 0;
     virtual void Visit(const DecimalOperator& op) = 0;
+    virtual void Visit(const StoreVariableOperator& op) = 0;
+    virtual void Visit(const StoreArrayOperator& op) = 0;
     virtual void Visit(const BinaryOperator& op) = 0;
     virtual void Visit(const ConditionalOperator& op) = 0;
     virtual void Visit(const UserDefinedOperator& op) = 0;
@@ -232,6 +242,74 @@ public:
     MAKE_GET_OPERANDS()
 };
 
+class LoadVariableOperator : public Operator
+{
+private:
+    std::string variableName;
+
+public:
+    LoadVariableOperator(std::string&& variableName) : variableName(variableName) {}
+
+    LoadVariableOperator(const std::string& variableName) : variableName(variableName) {}
+
+    const std::string& GetVariableName() const
+    {
+        return variableName;
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "LoadVariableOperator [VariableName = \"" + variableName + "\"]";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS()
+};
+
+class LoadArrayOperator : public Operator
+{
+private:
+    std::shared_ptr<Operator> index;
+
+public:
+    LoadArrayOperator(const std::shared_ptr<Operator>& index) : index(index) {}
+
+    const std::shared_ptr<Operator>& GetIndex() const
+    {
+        return index;
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "LoadArrayOperator []";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS(index)
+};
+
+class PrintCharOperator : public Operator
+{
+private:
+    std::shared_ptr<Operator> character;
+
+public:
+    PrintCharOperator(const std::shared_ptr<Operator>& character) : character(character) {}
+
+    const std::shared_ptr<Operator>& GetCharacter() const
+    {
+        return character;
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "PrintCharOperator []";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS(character)
+};
+
 class ParenthesisOperator : public Operator
 {
 private:
@@ -294,6 +372,73 @@ public:
 
     MAKE_ACCEPT;
     MAKE_GET_OPERANDS(operand)
+};
+
+class StoreVariableOperator : public Operator
+{
+private:
+    std::shared_ptr<Operator> operand;
+    std::string variableName;
+
+public:
+    StoreVariableOperator(const std::shared_ptr<Operator>& operand, const std::string& variableName)
+        : operand(operand), variableName(variableName)
+    {
+    }
+
+    StoreVariableOperator(const std::shared_ptr<Operator>& operand, std::string&& variableName)
+        : operand(operand), variableName(variableName)
+    {
+    }
+
+    const std::shared_ptr<Operator>& GetOperand() const
+    {
+        return operand;
+    }
+
+    const std::string& GetVariableName() const
+    {
+        return variableName;
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "StoreVariableOperator [VariableName = " + variableName + "]";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS(operand)
+};
+
+class StoreArrayOperator : public Operator
+{
+private:
+    std::shared_ptr<Operator> value, index;
+
+public:
+    StoreArrayOperator(const std::shared_ptr<Operator>& value,
+                       const std::shared_ptr<Operator>& index)
+        : value(value), index(index)
+    {
+    }
+
+    const std::shared_ptr<Operator>& GetValue() const
+    {
+        return value;
+    }
+
+    const std::shared_ptr<Operator>& GetIndex() const
+    {
+        return index;
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "StoreArrayOperator []";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS(value, index)
 };
 
 enum class BinaryType

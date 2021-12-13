@@ -35,6 +35,21 @@ public:
         value = 0;
     };
 
+    virtual void Visit(const LoadVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const LoadArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
+    virtual void Visit(const PrintCharOperator& op) override
+    {
+        throw std::string("Not implemented");
+    };
+
     virtual void Visit(const ParenthesisOperator& op) override
     {
         value = 0;
@@ -49,6 +64,16 @@ public:
     {
         op.GetOperand()->Accept(*this);
         value = value * 10 + op.GetValue();
+    }
+
+    virtual void Visit(const StoreVariableOperator& op) override
+    {
+        throw std::string("Not implemented");
+    }
+
+    virtual void Visit(const StoreArrayOperator& op) override
+    {
+        throw std::string("Not implemented");
     }
 
     virtual void Visit(const BinaryOperator& op) override
