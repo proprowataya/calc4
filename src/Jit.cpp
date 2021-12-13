@@ -338,7 +338,7 @@ public:
 
     virtual void Visit(const PrecomputedOperator& op) override
     {
-        this->value = this->builder->getIntN(IntegerBits<TNumber>, op.GetValue<TNumber>());
+        this->value = llvm::ConstantInt::getSigned(GetIntegerType(), op.GetValue<TNumber>());
     }
 
     virtual void Visit(const OperandOperator& op) override
@@ -610,7 +610,7 @@ public:
         {
             this->builder->CreateCall(
                 gmp->llvm_mpz_set_si,
-                { GetValuePtr(), this->builder->getInt32(precomputed.get_si()) });
+                { GetValuePtr(), this->builder->getIntN(IntegerBits<long>, precomputed.get_si()) });
         }
         else
         {
