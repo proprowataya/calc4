@@ -129,7 +129,7 @@ void TestOne(TestCase test, TestResult& testResult)
                 cout << "Testing for \"" << test.input
                      << "\" (optimize = " << (optimize ? "on" : "off")
                      << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name()
-                     << ")" << endl;
+                     << ") ";
                 CompilationContext context;
                 auto tokens = Lex(test.input, context);
                 auto op = Parse(tokens, context);
