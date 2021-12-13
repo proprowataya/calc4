@@ -1,56 +1,65 @@
 #pragma once
 
-#include <gmpxx.h>
 #include "Operators.h"
+#include <gmpxx.h>
 
 template<typename TNumber>
-class Evaluator : public OperatorVisitor {
+class Evaluator : public OperatorVisitor
+{
 private:
-    const CompilationContext *context;
-    std::stack<TNumber *> arguments;
+    const CompilationContext* context;
+    std::stack<TNumber*> arguments;
 
 public:
     TNumber value;
 
-    Evaluator(const CompilationContext *context)
-        : context(context) {}
+    Evaluator(const CompilationContext* context) : context(context) {}
 
-    virtual void Visit(const ZeroOperator &op) override {
+    virtual void Visit(const ZeroOperator& op) override
+    {
         value = 0;
     }
 
-    virtual void Visit(const PrecomputedOperator &op) override {
+    virtual void Visit(const PrecomputedOperator& op) override
+    {
         value = op.GetValue<TNumber>();
     }
 
-    virtual void Visit(const OperandOperator &op) override {
+    virtual void Visit(const OperandOperator& op) override
+    {
         value = arguments.top()[op.GetIndex()];
     };
 
-    virtual void Visit(const DefineOperator &op) override {
+    virtual void Visit(const DefineOperator& op) override
+    {
         value = 0;
     };
 
-    virtual void Visit(const ParenthesisOperator &op) override {
+    virtual void Visit(const ParenthesisOperator& op) override
+    {
         value = 0;
 
-        for (auto& item : op.GetOperators()) {
+        for (auto& item : op.GetOperators())
+        {
             item->Accept(*this);
         }
     }
 
-    virtual void Visit(const DecimalOperator &op) override {
+    virtual void Visit(const DecimalOperator& op) override
+    {
         op.GetOperand()->Accept(*this);
         value = value * 10 + op.GetValue();
     }
 
-    virtual void Visit(const BinaryOperator &op) override {
+    virtual void Visit(const BinaryOperator& op) override
+    {
         op.GetLeft()->Accept(*this);
         auto left = value;
         op.GetRight()->Accept(*this);
         auto right = value;
 
-        switch (op.GetType()) {
+        switch (op.GetType())
+        {
         case BinaryType::Add:
             value = left + right;
             break;
@@ -90,22 +99,29 @@ public:
         }
     }
 
-    virtual void Visit(const ConditionalOperator &op) override {
+    virtual void Visit(const ConditionalOperator& op) override
+    {
         op.GetCondition()->Accept(*this);
 
-        if (value != 0) {
+        if (value != 0)
+        {
             op.GetIfTrue()->Accept(*this);
-        } else {
+        }
+        else
+        {
             op.GetIfFalse()->Accept(*this);
         }
     };
 
-    virtual void Visit(const UserDefinedOperator &op) override {
+    virtual void Visit(const UserDefinedOperator& op) override
+    {
         size_t size = op.GetDefinition().GetNumOperands();
-        TNumber *arg = std::is_same<TNumber, mpz_class>::value ? new TNumber[size] : STACK_ALLOC(TNumber, size);
+        TNumber* arg = std::is_same<TNumber, mpz_class>::value ? new TNumber[size]
+                                                               : STACK_ALLOC(TNumber, size);
 
         auto operands = op.GetOperands();
-        for (size_t i = 0; i < size; i++) {
+        for (size_t i = 0; i < size; i++)
+        {
             operands[i]->Accept(*this);
             arg[i] = value;
         }
@@ -114,7 +130,8 @@ public:
         context->GetOperatorImplement(op.GetDefinition().GetName()).GetOperator()->Accept(*this);
         arguments.pop();
 
-        if (std::is_same<TNumber, mpz_class>::value) {
+        if (std::is_same<TNumber, mpz_class>::value)
+        {
             delete[] arg;
         }
     }

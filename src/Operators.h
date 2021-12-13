@@ -1,14 +1,14 @@
 ﻿#pragma once
 
-#include <vector>
-#include <memory>
-#include <string>
-#include <sstream>
-#include <unordered_map>
-#include <stack>
 #include "Common.h"
+#include <memory>
+#include <sstream>
+#include <stack>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-#define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE *>(alloca(sizeof(TYPE) * (LENGTH)))
+#define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE*>(alloca(sizeof(TYPE) * (LENGTH)))
 
 /* ********** */
 
@@ -25,113 +25,142 @@ class UserDefinedOperator;
 
 /* ********** */
 
-class OperatorVisitor {
+class OperatorVisitor
+{
 public:
-    virtual void Visit(const ZeroOperator &op) = 0;
-    virtual void Visit(const PrecomputedOperator &op) = 0;
-    virtual void Visit(const OperandOperator &op) = 0;
-    virtual void Visit(const DefineOperator &op) = 0;
-    virtual void Visit(const ParenthesisOperator &op) = 0;
-    virtual void Visit(const DecimalOperator &op) = 0;
-    virtual void Visit(const BinaryOperator &op) = 0;
-    virtual void Visit(const ConditionalOperator &op) = 0;
-    virtual void Visit(const UserDefinedOperator &op) = 0;
+    virtual void Visit(const ZeroOperator& op) = 0;
+    virtual void Visit(const PrecomputedOperator& op) = 0;
+    virtual void Visit(const OperandOperator& op) = 0;
+    virtual void Visit(const DefineOperator& op) = 0;
+    virtual void Visit(const ParenthesisOperator& op) = 0;
+    virtual void Visit(const DecimalOperator& op) = 0;
+    virtual void Visit(const BinaryOperator& op) = 0;
+    virtual void Visit(const ConditionalOperator& op) = 0;
+    virtual void Visit(const UserDefinedOperator& op) = 0;
     virtual ~OperatorVisitor() = default;
 };
 
 /* ********** */
 
-class OperatorDefinition {
+class OperatorDefinition
+{
 private:
     std::string name;
     int numOperands;
 
 public:
-    OperatorDefinition(const std::string &name, int numOperands)
-        : name(name), numOperands(numOperands) {}
+    OperatorDefinition(const std::string& name, int numOperands)
+        : name(name), numOperands(numOperands)
+    {
+    }
 
-    const std::string &GetName() const {
+    const std::string& GetName() const
+    {
         return name;
     }
 
-    int GetNumOperands() const {
+    int GetNumOperands() const
+    {
         return numOperands;
     }
 };
 
-class OperatorImplement {
+class OperatorImplement
+{
 private:
     OperatorDefinition definition;
     std::shared_ptr<Operator> op;
 
 public:
-    OperatorImplement(const OperatorDefinition &definition, const std::shared_ptr<Operator> &op)
-        : definition(definition), op(op) {}
+    OperatorImplement(const OperatorDefinition& definition, const std::shared_ptr<Operator>& op)
+        : definition(definition), op(op)
+    {
+    }
 
-    const OperatorDefinition &GetDefinition() const {
+    const OperatorDefinition& GetDefinition() const
+    {
         return definition;
     }
 
-    const std::shared_ptr<Operator> &GetOperator() const {
+    const std::shared_ptr<Operator>& GetOperator() const
+    {
         return op;
     }
 };
 
-class CompilationContext {
+class CompilationContext
+{
 private:
     std::unordered_map<std::string, OperatorImplement> userDefinedOperators;
 
 public:
-    void AddOperatorImplement(const OperatorImplement &implement) {
-        auto p = userDefinedOperators.insert(std::make_pair(implement.GetDefinition().GetName(), implement));
-        if (!p.second) {
+    void AddOperatorImplement(const OperatorImplement& implement)
+    {
+        auto p = userDefinedOperators.insert(
+            std::make_pair(implement.GetDefinition().GetName(), implement));
+        if (!p.second)
+        {
             p.first->second = implement;
         }
     }
 
-    const OperatorImplement &GetOperatorImplement(const std::string &name) const {
+    const OperatorImplement& GetOperatorImplement(const std::string& name) const
+    {
         return userDefinedOperators.at(name);
     }
 
-    const OperatorImplement *TryGetOperatorImplement(const std::string &name) const {
+    const OperatorImplement* TryGetOperatorImplement(const std::string& name) const
+    {
         auto it = userDefinedOperators.find(name);
-        if (it != userDefinedOperators.end()) {
+        if (it != userDefinedOperators.end())
+        {
             return &(it->second);
-        } else {
+        }
+        else
+        {
             return nullptr;
         }
     }
 
-    decltype(userDefinedOperators.cbegin()) UserDefinedOperatorBegin() const {
+    decltype(userDefinedOperators.cbegin()) UserDefinedOperatorBegin() const
+    {
         return userDefinedOperators.cbegin();
     }
 
-    decltype(userDefinedOperators.cend()) UserDefinedOperatorEnd() const {
+    decltype(userDefinedOperators.cend()) UserDefinedOperatorEnd() const
+    {
         return userDefinedOperators.cend();
     }
 };
 
 /* ********** */
 
-class Operator {
+class Operator
+{
 public:
-    virtual void Accept(OperatorVisitor &visitor) const = 0;
+    virtual void Accept(OperatorVisitor& visitor) const = 0;
     virtual std::vector<std::shared_ptr<Operator>> GetOperands() const = 0;
     virtual std::string ToString() const = 0;
     virtual ~Operator() = default;
 };
 
-#define MAKE_ACCEPT virtual void Accept(OperatorVisitor &visitor) const override {\
-	visitor.Visit(*this);\
-}
+#define MAKE_ACCEPT                                                                                \
+    virtual void Accept(OperatorVisitor& visitor) const override                                   \
+    {                                                                                              \
+        visitor.Visit(*this);                                                                      \
+    }
 
-#define MAKE_GET_OPERANDS(...) virtual std::vector<std::shared_ptr<Operator>> GetOperands() const override {\
-	return std::vector<std::shared_ptr<Operator>>({ __VA_ARGS__ });\
-}
+#define MAKE_GET_OPERANDS(...)                                                                     \
+    virtual std::vector<std::shared_ptr<Operator>> GetOperands() const override                    \
+    {                                                                                              \
+        return std::vector<std::shared_ptr<Operator>>({ __VA_ARGS__ });                            \
+    }
 
-class ZeroOperator : public Operator {
+class ZeroOperator : public Operator
+{
 public:
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         return "ZeroOperator []";
     }
 
@@ -139,21 +168,25 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class PrecomputedOperator : public Operator {
+class PrecomputedOperator : public Operator
+{
 private:
     AnyNumber value;
 
 public:
     template<typename TNumber>
-    PrecomputedOperator(const TNumber &value)
-        : value(value) {}
+    PrecomputedOperator(const TNumber& value) : value(value)
+    {
+    }
 
     template<typename TNumber>
-    const TNumber &GetValue() const {
+    const TNumber& GetValue() const
+    {
         return value.GetValue<TNumber>();
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         std::ostringstream oss;
         oss << "PrecomputedOperator [Value = " << value.ToString() << "]";
         return oss.str();
@@ -163,19 +196,21 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class OperandOperator : public Operator {
+class OperandOperator : public Operator
+{
 private:
     int index;
 
 public:
-    OperandOperator(int index)
-        : index(index) {}
+    OperandOperator(int index) : index(index) {}
 
-    int GetIndex() const {
+    int GetIndex() const
+    {
         return index;
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         std::ostringstream oss;
         oss << "OperandOperator [Index = " << index << "]";
         return oss.str();
@@ -185,9 +220,11 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class DefineOperator : public Operator {
+class DefineOperator : public Operator
+{
 public:
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         return "DefineOperator []";
     }
 
@@ -195,22 +232,28 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class ParenthesisOperator : public Operator {
+class ParenthesisOperator : public Operator
+{
 private:
     std::vector<std::shared_ptr<Operator>> operators;
 
 public:
-    ParenthesisOperator(const std::vector<std::shared_ptr<Operator>> &operators)
-        : operators(operators) {}
+    ParenthesisOperator(const std::vector<std::shared_ptr<Operator>>& operators)
+        : operators(operators)
+    {
+    }
 
-    ParenthesisOperator(std::vector<std::shared_ptr<Operator>> &&operators)
-        : operators(operators) {}
+    ParenthesisOperator(std::vector<std::shared_ptr<Operator>>&& operators) : operators(operators)
+    {
+    }
 
-    const std::vector<std::shared_ptr<Operator>> &GetOperators() const {
+    const std::vector<std::shared_ptr<Operator>>& GetOperators() const
+    {
         return operators;
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         std::ostringstream oss;
         oss << "ParenthesisOperator [" << operators.size() << " operators]";
         return oss.str();
@@ -220,24 +263,30 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class DecimalOperator : public Operator {
+class DecimalOperator : public Operator
+{
 private:
     std::shared_ptr<Operator> operand;
     int value;
 
 public:
-    DecimalOperator(const std::shared_ptr<Operator> &operand, int value)
-        : operand(operand), value(value) {}
+    DecimalOperator(const std::shared_ptr<Operator>& operand, int value)
+        : operand(operand), value(value)
+    {
+    }
 
-    const std::shared_ptr<Operator> &GetOperand() const {
+    const std::shared_ptr<Operator>& GetOperand() const
+    {
         return operand;
     }
 
-    int GetValue() const {
+    int GetValue() const
+    {
         return value;
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         std::ostringstream oss;
         oss << "DecimalOperator [Value = " << value << "]";
         return oss.str();
@@ -247,31 +296,62 @@ public:
     MAKE_GET_OPERANDS(operand)
 };
 
-enum class BinaryType { Add, Sub, Mult, Div, Mod, Equal, NotEqual, LessThan, LessThanOrEqual, GreaterThanOrEqual, GreaterThan };
+enum class BinaryType
+{
+    Add,
+    Sub,
+    Mult,
+    Div,
+    Mod,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    GreaterThan
+};
 
-class BinaryOperator : public Operator {
+class BinaryOperator : public Operator
+{
 private:
     std::shared_ptr<Operator> left, right;
     BinaryType type;
 
 public:
-    BinaryOperator(const std::shared_ptr<Operator> &left, const std::shared_ptr<Operator> &right, BinaryType type)
-        : left(left), right(right), type(type) {}
+    BinaryOperator(const std::shared_ptr<Operator>& left, const std::shared_ptr<Operator>& right,
+                   BinaryType type)
+        : left(left), right(right), type(type)
+    {
+    }
 
-    BinaryType GetType() const {
+    BinaryType GetType() const
+    {
         return type;
     }
 
-    const std::shared_ptr<Operator> &GetLeft() const {
+    const std::shared_ptr<Operator>& GetLeft() const
+    {
         return left;
     }
 
-    const std::shared_ptr<Operator> &GetRight() const {
+    const std::shared_ptr<Operator>& GetRight() const
+    {
         return right;
     }
 
-    virtual std::string ToString() const override {
-        static const char *BinaryTypeTable[] = { "Add", "Sub", "Mult", "Div", "Mod", "Equal", "NotEqual", "LessThan", "LessThanOrEqual", "GreaterThanOrEqual", "GreaterThan" };
+    virtual std::string ToString() const override
+    {
+        static const char* BinaryTypeTable[] = { "Add",
+                                                 "Sub",
+                                                 "Mult",
+                                                 "Div",
+                                                 "Mod",
+                                                 "Equal",
+                                                 "NotEqual",
+                                                 "LessThan",
+                                                 "LessThanOrEqual",
+                                                 "GreaterThanOrEqual",
+                                                 "GreaterThan" };
         std::ostringstream oss;
         oss << "BinaryOperator [Type = " << BinaryTypeTable[(size_t)type] << "]";
         return oss.str();
@@ -281,27 +361,36 @@ public:
     MAKE_GET_OPERANDS(left, right)
 };
 
-class ConditionalOperator : public Operator {
+class ConditionalOperator : public Operator
+{
 private:
     std::shared_ptr<Operator> condition, ifTrue, ifFalse;
 
 public:
-    ConditionalOperator(const std::shared_ptr<Operator> &condition, const std::shared_ptr<Operator> &ifTrue, const std::shared_ptr<Operator> &ifFalse)
-        : condition(condition), ifTrue(ifTrue), ifFalse(ifFalse) {}
+    ConditionalOperator(const std::shared_ptr<Operator>& condition,
+                        const std::shared_ptr<Operator>& ifTrue,
+                        const std::shared_ptr<Operator>& ifFalse)
+        : condition(condition), ifTrue(ifTrue), ifFalse(ifFalse)
+    {
+    }
 
-    const std::shared_ptr<Operator> &GetCondition() const {
+    const std::shared_ptr<Operator>& GetCondition() const
+    {
         return condition;
     }
 
-    const std::shared_ptr<Operator> &GetIfTrue() const {
+    const std::shared_ptr<Operator>& GetIfTrue() const
+    {
         return ifTrue;
     }
 
-    const std::shared_ptr<Operator> &GetIfFalse() const {
+    const std::shared_ptr<Operator>& GetIfFalse() const
+    {
         return ifFalse;
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         return "ConditionalOperator []";
     }
 
@@ -309,33 +398,44 @@ public:
     MAKE_GET_OPERANDS(condition, ifTrue, ifFalse)
 };
 
-class UserDefinedOperator : public Operator {
+class UserDefinedOperator : public Operator
+{
 private:
     OperatorDefinition definition;
     std::vector<std::shared_ptr<Operator>> operands;
 
 public:
-    UserDefinedOperator(const OperatorDefinition &definition, const std::vector<std::shared_ptr<Operator>> &operands)
-        : definition(definition), operands(operands) {}
+    UserDefinedOperator(const OperatorDefinition& definition,
+                        const std::vector<std::shared_ptr<Operator>>& operands)
+        : definition(definition), operands(operands)
+    {
+    }
 
-    UserDefinedOperator(const OperatorDefinition &definition, std::vector<std::shared_ptr<Operator>> &&operands)
-        : definition(definition), operands(operands) {}
+    UserDefinedOperator(const OperatorDefinition& definition,
+                        std::vector<std::shared_ptr<Operator>>&& operands)
+        : definition(definition), operands(operands)
+    {
+    }
 
-    const OperatorDefinition &GetDefinition() const {
+    const OperatorDefinition& GetDefinition() const
+    {
         return definition;
     }
 
     // TODO:
-    std::vector<std::shared_ptr<Operator>> GetOperands() const override {
+    std::vector<std::shared_ptr<Operator>> GetOperands() const override
+    {
         return operands;
     }
 
-    virtual std::string ToString() const override {
+    virtual std::string ToString() const override
+    {
         std::ostringstream oss;
-        oss << "UserDefinedOperator [Name = " << definition.GetName() << ", NumOperands = " << definition.GetNumOperands() << "]";
+        oss << "UserDefinedOperator [Name = " << definition.GetName()
+            << ", NumOperands = " << definition.GetNumOperands() << "]";
         return oss.str();
     }
 
     MAKE_ACCEPT;
-    //MAKE_GET_OPERANDS()
+    // MAKE_GET_OPERANDS()
 };
