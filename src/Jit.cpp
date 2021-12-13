@@ -489,7 +489,7 @@ public:
         oldBuilder->CreateCondBr(cond, ifTrue, ifFalse);
         ifTrueBuilder->CreateBr(finalBlock);
         ifFalseBuilder->CreateBr(finalBlock);
-        this->value = this->builder->CreateLoad(temp);
+        this->value = this->builder->CreateLoad(this->GetIntegerType(), temp);
     }
 
     virtual void Visit(const UserDefinedOperator& op) override
@@ -504,6 +504,12 @@ public:
 
         this->value =
             this->builder->CreateCall(this->functionMap[op.GetDefinition().GetName()], arguments);
+    }
+
+private:
+    llvm::Type* GetIntegerType() const
+    {
+        return this->builder->getIntNTy(IntegerBits<TNumber>);
     }
 };
 
@@ -563,7 +569,7 @@ public:
         }
 
         return this->builder->CreateInBoundsGEP(
-            val, { this->builder->getInt64(0), this->builder->getInt64(0) });
+            gmp->mpzIntType, val, { this->builder->getInt64(0), this->builder->getInt64(0) });
     }
 
     virtual void Visit(const ZeroOperator& op) override
@@ -586,8 +592,9 @@ public:
             std::stringstream ss;
             ss << precomputed;
             llvm::GlobalVariable* str = this->builder->CreateGlobalString(ss.str());
+            llvm::Type* charType = llvm::Type::getInt8Ty(*this->context);
             llvm::Value* strPtr = this->builder->CreateInBoundsGEP(
-                str, { this->builder->getInt64(0), this->builder->getInt64(0) });
+                charType, str, { this->builder->getInt64(0), this->builder->getInt64(0) });
             this->builder->CreateCall(gmp->llvm_mpz_set_str,
                                       { GetValuePtr(), strPtr, this->builder->getInt32(10) });
         }
@@ -730,8 +737,9 @@ public:
         op.GetCondition()->Accept(*this);
         llvm::Value* casted = this->builder->CreateBitCast(
             GetValuePtr(), llvm::PointerType::get(llvm::Type::getInt32Ty(*this->context), 0));
-        llvm::Value* ptr = this->builder->CreateInBoundsGEP(casted, this->builder->getInt32(1));
-        llvm::Value* sign = this->builder->CreateLoad(ptr);
+        llvm::Value* ptr = this->builder->CreateInBoundsGEP(llvm::Type::getInt32Ty(*this->context),
+                                                            casted, this->builder->getInt32(1));
+        llvm::Value* sign = this->builder->CreateLoad(llvm::Type::getInt32Ty(*this->context), ptr);
         llvm::Value* cond = this->builder->CreateSelect(
             this->builder->CreateICmpNE(sign, this->builder->getInt32(0)),
             this->builder->getInt1(1), this->builder->getInt1(0));
