@@ -117,6 +117,32 @@ public:
     MAKE_GET_NUM_OPERANDS(0)
 };
 
+class LoadVariableToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    LoadVariableToken(const std::string& supplementaryText) : supplementaryText(supplementaryText)
+    {
+    }
+
+    const std::string& GetVariableName() const
+    {
+        return supplementaryText;
+    }
+
+    virtual std::shared_ptr<Operator> CreateOperator(
+        const std::vector<std::shared_ptr<Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return std::make_shared<LoadVariableOperator>(supplementaryText);
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(0)
+};
+
 class ParenthesisToken : public Token
 {
 private:
@@ -174,6 +200,70 @@ public:
     MAKE_GET_NUM_OPERANDS(1)
 };
 
+class StoreVariableToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    StoreVariableToken(const std::string& supplementaryText) : supplementaryText(supplementaryText)
+    {
+    }
+
+    const std::string& GetVariableName() const
+    {
+        return supplementaryText;
+    }
+
+    virtual std::shared_ptr<Operator> CreateOperator(
+        const std::vector<std::shared_ptr<Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return std::make_shared<StoreVariableOperator>(operands[0], supplementaryText);
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(1)
+};
+
+class LoadArrayToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    LoadArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+
+    virtual std::shared_ptr<Operator> CreateOperator(
+        const std::vector<std::shared_ptr<Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return std::make_shared<LoadArrayOperator>(operands[0]);
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(1)
+};
+
+class PrintCharToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    PrintCharToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+
+    virtual std::shared_ptr<Operator> CreateOperator(
+        const std::vector<std::shared_ptr<Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return std::make_shared<PrintCharOperator>(operands[0]);
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(1)
+};
+
 class BinaryOperatorToken : public Token
 {
 private:
@@ -196,6 +286,25 @@ public:
         CompilationContext& context) const override
     {
         return std::make_shared<BinaryOperator>(operands[0], operands[1], type);
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(2)
+};
+
+class StoreArrayToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    StoreArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+
+    virtual std::shared_ptr<Operator> CreateOperator(
+        const std::vector<std::shared_ptr<Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return std::make_shared<StoreArrayOperator>(operands[0], operands[1]);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;

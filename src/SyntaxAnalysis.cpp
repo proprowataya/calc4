@@ -55,6 +55,14 @@ public:
         {
         case 'D':
             return LexDefineToken();
+        case 'L':
+            return LexLoadVariableToken();
+        case 'S':
+            return LexStoreVariableToken();
+        case 'P':
+            return LexPrintCharToken();
+        case '@':
+            return LexLoadArrayToken();
         case '0':
         case '1':
         case '2':
@@ -111,6 +119,30 @@ public:
 
         /* ***** Construct token ***** */
         return std::make_shared<DefineToken>(name, arguments, tokens, LexSupplementaryText());
+    }
+
+    std::shared_ptr<LoadVariableToken> LexLoadVariableToken()
+    {
+        index++;
+        return std::make_shared<LoadVariableToken>(LexSupplementaryText());
+    }
+
+    std::shared_ptr<StoreVariableToken> LexStoreVariableToken()
+    {
+        index++;
+        return std::make_shared<StoreVariableToken>(LexSupplementaryText());
+    }
+
+    std::shared_ptr<PrintCharToken> LexPrintCharToken()
+    {
+        index++;
+        return std::make_shared<PrintCharToken>(LexSupplementaryText());
+    }
+
+    std::shared_ptr<LoadArrayToken> LexLoadArrayToken()
+    {
+        index++;
+        return std::make_shared<LoadArrayToken>(LexSupplementaryText());
     }
 
     std::shared_ptr<DecimalToken> LexDecimalToken()
@@ -188,6 +220,11 @@ public:
                 index += 2;
                 return std::make_shared<BinaryOperatorToken>(BinaryType::LessThanOrEqual,
                                                              LexSupplementaryText());
+            }
+            else if (substr == "->")
+            {
+                index += 2;
+                return std::make_shared<StoreArrayToken>(LexSupplementaryText());
             }
         }
 
