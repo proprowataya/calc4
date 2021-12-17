@@ -10,7 +10,7 @@ template<typename TNumber>
 class DefaultVariableSource;
 
 template<typename TNumber>
-class Calc4GlobalArraySource;
+class DefaultGlobalArraySource;
 
 struct DefaultPrinter
 {
@@ -21,7 +21,7 @@ struct DefaultPrinter
 };
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
-         typename TGlobalArraySource = Calc4GlobalArraySource<TNumber>,
+         typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
          typename TPrinter = DefaultPrinter>
 class ExecutionState
 {
@@ -101,7 +101,7 @@ public:
 };
 
 template<typename TNumber>
-class Calc4GlobalArraySource
+class DefaultGlobalArraySource
 {
 public:
     using IndexType = long long;
@@ -116,9 +116,9 @@ private:
     std::unordered_map<IndexType, TNumber> dictionary;
 
 public:
-    Calc4GlobalArraySource() : array(DefaultArraySize), dictionary() {}
+    DefaultGlobalArraySource() : array(DefaultArraySize), dictionary() {}
 
-    Calc4GlobalArraySource(size_t arraySize) : array(arraySize), dictionary() {}
+    DefaultGlobalArraySource(size_t arraySize) : array(arraySize), dictionary() {}
 
     TNumber Get(const TNumber& index) const
     {
