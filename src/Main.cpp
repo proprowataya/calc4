@@ -47,8 +47,10 @@ constexpr const char* InfinitePrecisionInteger = "inf";
 inline bool StringEquals(const char* a, const char* b);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
+
 template<typename TNumber>
-void ReplCore(const std::string& line, const Option& option);
+void ReplCore(Option& option);
+
 void PrintTree(const Operator& op, int depth);
 bool HasRecursiveCall(const Operator& op, const CompilationContext& context);
 bool HasRecursiveCallInternal(const Operator& op, const CompilationContext& context,
@@ -179,62 +181,23 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    while (true)
+    switch (option.integerSize)
     {
-        try
-        {
-            string line;
-            cout << "> ";
-            getline(cin, line);
-
-            if (line == "#print on")
-            {
-                option.printInfo = true;
-                cout << endl;
-                continue;
-            }
-            else if (line == "#print off")
-            {
-                option.printInfo = false;
-                cout << endl;
-                continue;
-            }
-            else if (line == "#optimize on")
-            {
-                option.optimize = true;
-                cout << endl;
-                continue;
-            }
-            else if (line == "#optimize off")
-            {
-                option.optimize = false;
-                cout << endl;
-                continue;
-            }
-
-            switch (option.integerSize)
-            {
-            case 32:
-                ReplCore<int32_t>(line, option);
-                break;
-            case 64:
-                ReplCore<int64_t>(line, option);
-                break;
-            case 128:
-                ReplCore<__int128_t>(line, option);
-                break;
-            case InfinitePrecisionIntegerSize:
-                ReplCore<mpz_class>(line, option);
-                break;
-            default:
-                UNREACHABLE();
-                break;
-            }
-        }
-        catch (std::string& error)
-        {
-            cout << "Error: " << error << endl << endl;
-        }
+    case 32:
+        ReplCore<int32_t>(option);
+        break;
+    case 64:
+        ReplCore<int64_t>(option);
+        break;
+    case 128:
+        ReplCore<__int128_t>(option);
+        break;
+    case InfinitePrecisionIntegerSize:
+        ReplCore<mpz_class>(option);
+        break;
+    default:
+        UNREACHABLE();
+        break;
     }
 
     llvm_shutdown();
@@ -287,66 +250,110 @@ void PrintHelp(int argc, char** argv)
 }
 
 template<typename TNumber>
-void ReplCore(const std::string& line, const Option& option)
+void ReplCore(Option& option)
 {
     using namespace std;
     using namespace llvm;
 
     CompilationContext context;
+    ExecutionState<TNumber, DefaultVariableSource<TNumber>, Calc4GlobalArraySource<TNumber>> state;
 
-    auto tokens = Lex(line, context);
-    auto op = Parse(tokens, context);
-    if (option.optimize)
+    while (true)
     {
-        op = Optimize<TNumber>(context, op);
-    }
-
-    bool hasRecursiveCall = HasRecursiveCall(*op, context);
-
-    if (option.printInfo)
-    {
-        cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
-
-        cout << "Tree:" << endl
-             << "---------------------------" << endl
-             << "Module {" << endl
-             << "Main:" << endl;
-        PrintTree(*op, 1);
-        cout << endl;
-
-        for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd();
-             it++)
+        try
         {
-            auto& name = it->second.GetDefinition().GetName();
-            auto& op = it->second.GetOperator();
+            string line;
+            cout << "> ";
+            getline(cin, line);
 
-            cout << name << ":" << endl;
-            PrintTree(*op, 1);
+            if (line == "#print on")
+            {
+                option.printInfo = true;
+                cout << endl;
+                continue;
+            }
+            else if (line == "#print off")
+            {
+                option.printInfo = false;
+                cout << endl;
+                continue;
+            }
+            else if (line == "#optimize on")
+            {
+                option.optimize = true;
+                cout << endl;
+                continue;
+            }
+            else if (line == "#optimize off")
+            {
+                option.optimize = false;
+                cout << endl;
+                continue;
+            }
+
+            auto tokens = Lex(line, context);
+            auto op = Parse(tokens, context);
+            if (option.optimize)
+            {
+                op = Optimize<TNumber>(context, op);
+            }
+
+            bool hasRecursiveCall = HasRecursiveCall(*op, context);
+
+            if (option.printInfo)
+            {
+                cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
+
+                cout << "Tree:" << endl
+                     << "---------------------------" << endl
+                     << "Module {" << endl
+                     << "Main:" << endl;
+                PrintTree(*op, 1);
+                cout << endl;
+
+                for (auto it = context.UserDefinedOperatorBegin();
+                     it != context.UserDefinedOperatorEnd(); it++)
+                {
+                    auto& name = it->second.GetDefinition().GetName();
+                    auto& op = it->second.GetOperator();
+
+                    cout << name << ":" << endl;
+                    PrintTree(*op, 1);
+                }
+
+                cout << "}" << endl << "---------------------------" << endl << endl;
+            }
+
+            TNumber result;
+            clock_t start = clock();
+            {
+                if (option.executionType == ExecutionType::JIT &&
+                    (option.alwaysJit || HasRecursiveCall(*op, context)))
+                {
+                    result = EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo);
+                }
+                else
+                {
+                    Evaluator<TNumber, DefaultVariableSource<TNumber>,
+                              Calc4GlobalArraySource<TNumber>>
+                        eval(&context, &state);
+
+                    op->Accept(eval);
+                    result = eval.value;
+                }
+            }
+            clock_t end = clock();
+
+            cout << result << endl
+                 << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms"
+                 << endl
+                 << endl;
         }
-
-        cout << "}" << endl << "---------------------------" << endl << endl;
-    }
-
-    TNumber result;
-    clock_t start = clock();
-    {
-        if (option.executionType == ExecutionType::JIT &&
-            (option.alwaysJit || HasRecursiveCall(*op, context)))
+        catch (std::string& error)
         {
-            result = EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo);
-        }
-        else
-        {
-            Evaluator<TNumber> eval(&context);
-            op->Accept(eval);
-            result = eval.value;
+            cout << "Error: " << error << endl << endl;
         }
     }
-    clock_t end = clock();
-
-    cout << result << endl
-         << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
-         << endl;
 }
 
 void PrintTree(const Operator& op, int depth)

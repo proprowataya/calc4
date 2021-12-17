@@ -1,19 +1,25 @@
 #pragma once
 
+#include "ExecutionState.h"
 #include "Operators.h"
 #include <gmpxx.h>
 
-template<typename TNumber>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource>
 class Evaluator : public OperatorVisitor
 {
 private:
     const CompilationContext* context;
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource>* state;
     std::stack<TNumber*> arguments;
 
 public:
     TNumber value;
 
-    Evaluator(const CompilationContext* context) : context(context) {}
+    Evaluator(const CompilationContext* context,
+              ExecutionState<TNumber, TVariableSource, TGlobalArraySource>* state)
+        : context(context), state(state)
+    {
+    }
 
     virtual void Visit(const ZeroOperator& op) override
     {
@@ -37,12 +43,14 @@ public:
 
     virtual void Visit(const LoadVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        value = state->GetVariableSource().Get(op.GetVariableName());
     };
 
     virtual void Visit(const LoadArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetIndex()->Accept(*this);
+        auto index = value;
+        value = state->GetArraySource().Get(index);
     };
 
     virtual void Visit(const PrintCharOperator& op) override
@@ -68,12 +76,20 @@ public:
 
     virtual void Visit(const StoreVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetOperand()->Accept(*this);
+        state->GetVariableSource().Set(op.GetVariableName(), value);
     }
 
     virtual void Visit(const StoreArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetValue()->Accept(*this);
+        auto valueToBeStored = value;
+
+        op.GetIndex()->Accept(*this);
+        auto index = value;
+
+        state->GetArraySource().Set(index, valueToBeStored);
+        value = valueToBeStored;
     }
 
     virtual void Visit(const BinaryOperator& op) override
