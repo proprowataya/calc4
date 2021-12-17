@@ -21,11 +21,6 @@ private:
 public:
     ExecutionState() {}
 
-    ExecutionState(TVariableSource&& variableSource, TGlobalArraySource&& arraySource)
-        : variableSource(variableSource), arraySource(arraySource)
-    {
-    }
-
     TVariableSource& GetVariableSource()
     {
         return variableSource;
