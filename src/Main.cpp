@@ -334,9 +334,7 @@ void ReplCore(Option& option)
                 }
                 else
                 {
-                    Evaluator<TNumber> eval(&context, &state);
-                    op->Accept(eval);
-                    result = eval.value;
+                    result = Evaluate<TNumber>(context, state, op);
                 }
             }
             clock_t end = clock();

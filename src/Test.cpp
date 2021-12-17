@@ -146,9 +146,7 @@ void TestOne(TestCase test, TestResult& testResult)
                 else
                 {
                     ExecutionState<TNumber> state;
-                    Evaluator<TNumber> eval(&context, &state);
-                    op->Accept(eval);
-                    result = eval.value;
+                    result = Evaluate(context, state, op);
                 }
 
                 if (result != test.expected)
