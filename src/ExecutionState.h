@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include <gmpxx.h>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -11,7 +12,16 @@ class DefaultVariableSource;
 template<typename TNumber>
 class Calc4GlobalArraySource;
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource>
+struct DefaultPrinter
+{
+    void operator()(char c) const
+    {
+        std::cout << c;
+    }
+};
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TPrinter = DefaultPrinter>
 class ExecutionState
 {
 private:
@@ -39,6 +49,11 @@ public:
     const TGlobalArraySource& GetArraySource() const
     {
         return arraySource;
+    }
+
+    void PrintChar(char c) const
+    {
+        TPrinter{}(c);
     }
 };
 

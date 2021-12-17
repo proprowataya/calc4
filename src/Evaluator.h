@@ -4,19 +4,20 @@
 #include "Operators.h"
 #include <gmpxx.h>
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TPrinter = DefaultPrinter>
 class Evaluator : public OperatorVisitor
 {
 private:
     const CompilationContext* context;
-    ExecutionState<TNumber, TVariableSource, TGlobalArraySource>* state;
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>* state;
     std::stack<TNumber*> arguments;
 
 public:
     TNumber value;
 
     Evaluator(const CompilationContext* context,
-              ExecutionState<TNumber, TVariableSource, TGlobalArraySource>* state)
+              ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>* state)
         : context(context), state(state)
     {
     }
@@ -55,7 +56,20 @@ public:
 
     virtual void Visit(const PrintCharOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetCharacter()->Accept(*this);
+
+        char c;
+        if constexpr (std::is_same_v<TNumber, mpz_class>)
+        {
+            c = static_cast<char>(value.get_si());
+        }
+        else
+        {
+            c = static_cast<char>(value);
+        }
+
+        state->PrintChar(c);
+        value = static_cast<TNumber>(0);
     };
 
     virtual void Visit(const ParenthesisOperator& op) override
