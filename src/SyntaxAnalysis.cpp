@@ -267,13 +267,30 @@ public:
 
         index++;
         size_t begin = index;
-        size_t end = text.find_first_of(']', begin);
-        if (end == std::string::npos)
+        int depth = 1;
+
+        while (index < text.length() && depth > 0)
+        {
+            char c = text[index];
+
+            if (c == '[')
+            {
+                depth++;
+            }
+            else if (c == ']')
+            {
+                depth--;
+            }
+
+            index++;
+        }
+
+        if (depth != 0)
         {
             throw ErrorMessage::TokenExpected("]");
         }
 
-        index = end + 1;
+        size_t end = index - 1;
         return text.substr(begin, end - begin);
     }
 };
