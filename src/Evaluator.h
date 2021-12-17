@@ -4,7 +4,8 @@
 #include "Operators.h"
 #include <gmpxx.h>
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
+         typename TGlobalArraySource = Calc4GlobalArraySource<TNumber>,
          typename TPrinter = DefaultPrinter>
 class Evaluator : public OperatorVisitor
 {

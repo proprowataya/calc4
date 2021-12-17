@@ -256,7 +256,7 @@ void ReplCore(Option& option)
     using namespace llvm;
 
     CompilationContext context;
-    ExecutionState<TNumber, DefaultVariableSource<TNumber>, Calc4GlobalArraySource<TNumber>> state;
+    ExecutionState<TNumber> state;
 
     while (true)
     {
@@ -334,10 +334,7 @@ void ReplCore(Option& option)
                 }
                 else
                 {
-                    Evaluator<TNumber, DefaultVariableSource<TNumber>,
-                              Calc4GlobalArraySource<TNumber>>
-                        eval(&context, &state);
-
+                    Evaluator<TNumber> eval(&context, &state);
                     op->Accept(eval);
                     result = eval.value;
                 }

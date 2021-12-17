@@ -145,10 +145,8 @@ void TestOne(TestCase test, TestResult& testResult)
                 }
                 else
                 {
-                    using TVariableSource = DefaultVariableSource<TNumber>;
-                    using TGlobalArraySource = Calc4GlobalArraySource<TNumber>;
-                    ExecutionState<TNumber, TVariableSource, TGlobalArraySource> state;
-                    Evaluator<TNumber, TVariableSource, TGlobalArraySource> eval(&context, &state);
+                    ExecutionState<TNumber> state;
+                    Evaluator<TNumber> eval(&context, &state);
                     op->Accept(eval);
                     result = eval.value;
                 }

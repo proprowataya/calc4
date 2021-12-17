@@ -20,16 +20,20 @@ struct DefaultPrinter
     }
 };
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
+         typename TGlobalArraySource = Calc4GlobalArraySource<TNumber>,
          typename TPrinter = DefaultPrinter>
 class ExecutionState
 {
 private:
     TVariableSource variableSource;
     TGlobalArraySource arraySource;
+    TPrinter printer;
 
 public:
     ExecutionState() {}
+
+    ExecutionState(TPrinter printer) : printer(printer) {}
 
     TVariableSource& GetVariableSource()
     {
@@ -53,7 +57,7 @@ public:
 
     void PrintChar(char c) const
     {
-        TPrinter{}(c);
+        printer(c);
     }
 };
 
