@@ -59,17 +59,20 @@ public:
 
     virtual void Visit(const LoadVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        // TODO:
+        value = std::make_shared<LoadVariableOperator>(op.GetVariableName());
     };
 
     virtual void Visit(const LoadArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        std::shared_ptr<Operator> index = Precompute(op.GetIndex());
+        value = std::make_shared<LoadArrayOperator>(index);
     };
 
     virtual void Visit(const PrintCharOperator& op) override
     {
-        throw std::string("Not implemented");
+        std::shared_ptr<Operator> character = Precompute(op.GetCharacter());
+        value = std::make_shared<PrintCharOperator>(character);
     };
 
     virtual void Visit(const ParenthesisOperator& op) override
@@ -115,12 +118,15 @@ public:
 
     virtual void Visit(const StoreVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        std::shared_ptr<Operator> operand = Precompute(op.GetOperand());
+        value = std::make_shared<StoreVariableOperator>(operand, op.GetVariableName());
     }
 
     virtual void Visit(const StoreArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        std::shared_ptr<Operator> valueToBeStored = Precompute(op.GetValue());
+        std::shared_ptr<Operator> index = Precompute(op.GetIndex());
+        value = std::make_shared<StoreArrayOperator>(valueToBeStored, index);
     }
 
     virtual void Visit(const BinaryOperator& op) override
