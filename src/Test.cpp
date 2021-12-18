@@ -133,7 +133,10 @@ void TestOne(TestCase test, TestResult& testResult)
 
                 TNumber result;
                 std::string consoleOutput;
-                auto Print = [&consoleOutput](char c) { consoleOutput.push_back(c); };
+                BufferedPrinter printer(&consoleOutput);
+                ExecutionState<TNumber, DefaultVariableSource<TNumber>,
+                               DefaultGlobalArraySource<TNumber>, BufferedPrinter>
+                    state(printer);
 
                 if constexpr (std::is_same_v<TNumber, mpz_class>)
                 {
@@ -144,9 +147,6 @@ void TestOne(TestCase test, TestResult& testResult)
                     }
                     else
                     {
-                        ExecutionState<TNumber, DefaultVariableSource<TNumber>,
-                                       DefaultGlobalArraySource<TNumber>, decltype(Print)>
-                            state(Print);
                         result = Evaluate(context, state, op);
                     }
                 }
@@ -158,9 +158,6 @@ void TestOne(TestCase test, TestResult& testResult)
                     }
                     else
                     {
-                        ExecutionState<TNumber, DefaultVariableSource<TNumber>,
-                                       DefaultGlobalArraySource<TNumber>, decltype(Print)>
-                            state(Print);
                         result = Evaluate(context, state, op);
                     }
                 }

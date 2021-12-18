@@ -3,6 +3,7 @@
 #include "Common.h"
 #include <gmpxx.h>
 #include <iostream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -17,6 +18,20 @@ struct DefaultPrinter
     void operator()(char c) const
     {
         std::cout << c;
+    }
+};
+
+struct BufferedPrinter
+{
+private:
+    std::string* buffer;
+
+public:
+    BufferedPrinter(std::string* buffer) : buffer(buffer) {}
+
+    void operator()(char c) const
+    {
+        buffer->push_back(c);
     }
 };
 
