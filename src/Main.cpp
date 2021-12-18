@@ -326,16 +326,17 @@ void ReplCore(Option& option)
 
             TNumber result;
             clock_t start = clock();
+            if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
-                if (option.executionType == ExecutionType::JIT &&
-                    (option.alwaysJit || HasRecursiveCall(*op, context)))
-                {
-                    result = EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo);
-                }
-                else
-                {
-                    result = Evaluate<TNumber>(context, state, op);
-                }
+                // Jit compiler does not support GMP
+                result = Evaluate<TNumber>(context, state, op);
+            }
+            else
+            {
+                result = (option.executionType == ExecutionType::JIT &&
+                          (option.alwaysJit || HasRecursiveCall(*op, context)))
+                    ? EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo)
+                    : Evaluate<TNumber>(context, state, op);
             }
             clock_t end = clock();
 

@@ -134,16 +134,35 @@ void TestOne(TestCase test, TestResult& testResult)
                 TNumber result;
                 std::string consoleOutput;
                 auto Print = [&consoleOutput](char c) { consoleOutput.push_back(c); };
-                if (jit)
+
+                if constexpr (std::is_same_v<TNumber, mpz_class>)
                 {
-                    result = EvaluateByJIT<TNumber>(context, op, optimize, false);
+                    if (jit)
+                    {
+                        // Jit compiler does not support GMP, so we skip execution
+                        continue;
+                    }
+                    else
+                    {
+                        ExecutionState<TNumber, DefaultVariableSource<TNumber>,
+                                       DefaultGlobalArraySource<TNumber>, decltype(Print)>
+                            state(Print);
+                        result = Evaluate(context, state, op);
+                    }
                 }
                 else
                 {
-                    ExecutionState<TNumber, DefaultVariableSource<TNumber>,
-                                   DefaultGlobalArraySource<TNumber>, decltype(Print)>
-                        state(Print);
-                    result = Evaluate(context, state, op);
+                    if (jit)
+                    {
+                        result = EvaluateByJIT<TNumber>(context, op, optimize, false);
+                    }
+                    else
+                    {
+                        ExecutionState<TNumber, DefaultVariableSource<TNumber>,
+                                       DefaultGlobalArraySource<TNumber>, decltype(Print)>
+                            state(Print);
+                        result = Evaluate(context, state, op);
+                    }
                 }
 
                 if (result != test.expected)
