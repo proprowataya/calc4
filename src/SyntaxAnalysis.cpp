@@ -36,9 +36,10 @@ public:
 
         while (index < text.length() && text[index] != ')')
         {
-            if (text[index] == ' ')
+            char c = text[index];
+            if (c == ' ' || c == '\n' || c == '\r')
             {
-                // Skip whitespace
+                // Skip whitespaces and line separators
                 index++;
                 continue;
             }
