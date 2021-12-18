@@ -14,6 +14,7 @@ struct TestCase
 {
     const char* input;
     int32_t expected;
+    const char* expectedConsoleOutput;
 };
 
 struct TestResult
@@ -39,21 +40,15 @@ constexpr TestCase TestCases[] = {
     { "12345678", 12345678 },
     { "1+2*3-10", -1 },
     { "0?1?2?3?4", 3 },
-    { "72P101P108P108P111P10P", 0 },
-    { "D[print||72P101P108P108P111P10P] {print}", 0 },
+    { "72P101P108P108P111P10P", 0, "Hello\n" },
+    { "D[print||72P101P108P108P111P10P] {print}", 0, "Hello\n" },
     { "D[add|x,y|x+y] 12{add}23", 35 },
     { "D[get12345||12345] {get12345}+{get12345}", 24690 },
     { "D[fact|x,y|x==0?y?(x-1){fact}(x*y)] 10{fact}1", 3628800 },
-
-    // Fibonacci
     { "D[fib|n|n<=1?n?(n-1){fib}+(n-2){fib}] 10{fib}", 55 },
     { "D[fibImpl|x,a,b|x ? ((x-1) ? ((x-1){fibImpl}(a+b){fibImpl}a) ? a) ? b] D[fib|x|x{fibImpl}1{fibImpl}0] 10{fib}", 55 },
     { "D[f|a,b,p,q,c|c < 2 ? ((a*p) + (b*q)) ? (c % 2 ? ((a*p) + (b*q) {f} (a*q) + (b*q) + (b*p) {f} (p*p) + (q*q) {f} (2*p+q)*q {f} c/2) ? (a {f} b {f} (p*p) + (q*q) {f} (2*p+q)*q {f} c/2))] D[fib|n|0{f}1{f}0{f}1{f}n] 10{fib}", 55 },
-
-    // Tarai
     { "D[tarai|x,y,z|x <= y ? y ? (((x - 1){tarai}y{tarai}z){tarai}((y - 1){tarai}z{tarai}x){tarai}((z - 1){tarai}x{tarai}y))] 10{tarai}5{tarai}5", 5 },
-
-    // User defined variables
     { "1S", 1 },
     { "L", 0 },
     { "1S[var]", 1 },
@@ -75,8 +70,6 @@ constexpr TestCase TestCases[] = {
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 3S {fib2}", 2 },
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 20S {fib2}", 6765 },
     { "D[fib|n|10S(n<=1?n?((n-1){fib}+(n-2){fib}))S] 20{fib} L", 6765 },
-
-    // Array accesses
     { "0@", 0 },
     { "5->0", 5 },
     { "(10->20)L[zero]20@", 10 },
@@ -139,13 +132,17 @@ void TestOne(TestCase test, TestResult& testResult)
                 }
 
                 TNumber result;
+                std::string consoleOutput;
+                auto Print = [&consoleOutput](char c) { consoleOutput.push_back(c); };
                 if (jit)
                 {
                     result = EvaluateByJIT<TNumber>(context, op, optimize, false);
                 }
                 else
                 {
-                    ExecutionState<TNumber> state;
+                    ExecutionState<TNumber, DefaultVariableSource<TNumber>,
+                                   DefaultGlobalArraySource<TNumber>, decltype(Print)>
+                        state(Print);
                     result = Evaluate(context, state, op);
                 }
 
@@ -153,6 +150,13 @@ void TestOne(TestCase test, TestResult& testResult)
                 {
                     cout << "---> [Failed] Expected: " << test.expected << ", Result: " << result
                          << endl;
+                    testResult.fail++;
+                }
+                else if (consoleOutput !=
+                         (test.expectedConsoleOutput != nullptr ? test.expectedConsoleOutput : ""))
+                {
+                    cout << "---> [Failed] Expected console output: " << test.expectedConsoleOutput
+                         << ", Result: " << consoleOutput << endl;
                     testResult.fail++;
                 }
                 else
