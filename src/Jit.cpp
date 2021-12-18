@@ -31,15 +31,20 @@
 #include "Operators.h"
 
 /* Explicit instantiation of "EvaluateByJIT" Function */
-#define InstantiateEvaluateByJIT(TNumber)                                                          \
-    template TNumber EvaluateByJIT<TNumber>(const CompilationContext& context,                     \
-                                            const std::shared_ptr<Operator>& op, bool optimize,    \
-                                            bool printInfo)
-// InstantiateEvaluateByJIT(int8_t);
-// InstantiateEvaluateByJIT(int16_t);
-InstantiateEvaluateByJIT(int32_t);
-InstantiateEvaluateByJIT(int64_t);
-InstantiateEvaluateByJIT(__int128_t);
+#define InstantiateEvaluateByJIT(TNumber, TPrinter)                                                \
+    template TNumber EvaluateByJIT<TNumber, DefaultVariableSource<TNumber>,                        \
+                                   DefaultGlobalArraySource<TNumber>, TPrinter>(                   \
+        const CompilationContext& context,                                                         \
+        ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
+                       TPrinter>& state,                                                           \
+        const std::shared_ptr<Operator>& op, bool optimize, bool printInfo)
+
+InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
+InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
+InstantiateEvaluateByJIT(__int128_t, DefaultPrinter);
+InstantiateEvaluateByJIT(int32_t, BufferedPrinter);
+InstantiateEvaluateByJIT(int64_t, BufferedPrinter);
+InstantiateEvaluateByJIT(__int128_t, BufferedPrinter);
 
 namespace
 {
@@ -48,16 +53,36 @@ constexpr const char* EntryBlockName = "entry";
 
 template<typename TNumber>
 size_t IntegerBits = sizeof(TNumber) * 8;
-template<typename TNumber>
-void GenerateIR(const CompilationContext& context, const std::shared_ptr<Operator>& op,
-                llvm::LLVMContext* llvmContext, llvm::Module* llvmModule);
-template<typename TNumber>
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void GenerateIR(const CompilationContext& context,
+                ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
+                const std::shared_ptr<Operator>& op, llvm::LLVMContext* llvmContext,
+                llvm::Module* llvmModule);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 class IRGenerator;
 }
 
-template<typename TNumber>
-TNumber EvaluateByJIT(const CompilationContext& context, const std::shared_ptr<Operator>& op,
-                      bool optimize, bool printInfo)
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void PrintChar(void* state, char c);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+TNumber LoadVariable(void* state, const char* variableName);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void StoreVariable(void* state, const char* variableName, TNumber value);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+TNumber LoadArray(void* state, TNumber index);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void StoreArray(void* state, TNumber index, TNumber value);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+TNumber EvaluateByJIT(const CompilationContext& context,
+                      ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
+                      const std::shared_ptr<Operator>& op, bool optimize, bool printInfo)
 {
     using namespace llvm;
     LLVMContext Context;
@@ -68,7 +93,7 @@ TNumber EvaluateByJIT(const CompilationContext& context, const std::shared_ptr<O
     M->setTargetTriple(LLVM_HOST_TRIPLE);
 
     /* ***** Generate LLVM-IR ***** */
-    GenerateIR<TNumber>(context, op, &Context, M);
+    GenerateIR<TNumber>(context, state, op, &Context, M);
 
     if (printInfo)
     {
@@ -123,39 +148,44 @@ TNumber EvaluateByJIT(const CompilationContext& context, const std::shared_ptr<O
         throw error;
     }
 
-    auto func = (TNumber(*)())EE->getFunctionAddress(MainFunctionName);
+    auto func =
+        (TNumber(*)(ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*))
+            EE->getFunctionAddress(MainFunctionName);
 
     if (!error.empty())
     {
         throw error;
     }
 
-    TNumber result = func();
+    TNumber result = func(&state);
     delete EE;
     return result;
 }
 
 namespace
 {
-template<typename TNumber>
-void GenerateIR(const CompilationContext& context, const std::shared_ptr<Operator>& op,
-                llvm::LLVMContext* llvmContext, llvm::Module* llvmModule)
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void GenerateIR(const CompilationContext& context,
+                ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
+                const std::shared_ptr<Operator>& op, llvm::LLVMContext* llvmContext,
+                llvm::Module* llvmModule)
 {
     /* ***** Initialize variables ***** */
     llvm::Type* integerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
     llvm::Type* usedDefinedReturnType = integerType;
+    llvm::Type* executionStateType = llvm::Type::getVoidTy(*llvmContext)->getPointerTo(0);
 
     /* ***** Make function map (operator's name -> LLVM function) and the functions ***** */
     std::unordered_map<std::string, llvm::Function*> functionMap;
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
     {
         auto& definition = it->second.GetDefinition();
-        size_t numArguments = definition.GetNumOperands();
 
         // Make arguments
-        std::vector<llvm::Type*> argumentTypes(numArguments);
-        std::generate_n(argumentTypes.begin(), numArguments,
-                        [integerType]() { return integerType; });
+        //  - The first argument is ExecutionState, and the rests are integers
+        std::vector<llvm::Type*> argumentTypes(definition.GetNumOperands() + 1);
+        argumentTypes[0] = executionStateType;
+        std::fill(argumentTypes.begin() + 1, argumentTypes.end(), integerType);
 
         llvm::FunctionType* functionType =
             llvm::FunctionType::get(usedDefinedReturnType, argumentTypes, false);
@@ -164,7 +194,8 @@ void GenerateIR(const CompilationContext& context, const std::shared_ptr<Operato
     }
 
     /* ***** Make main function ***** */
-    llvm::FunctionType* funcType = llvm::FunctionType::get(integerType, {}, false);
+    llvm::FunctionType* funcType =
+        llvm::FunctionType::get(integerType, { executionStateType }, false);
     llvm::Function* mainFunction = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage,
                                                           MainFunctionName, llvmModule);
 
@@ -176,8 +207,8 @@ void GenerateIR(const CompilationContext& context, const std::shared_ptr<Operato
         llvm::BasicBlock* block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         auto builder = std::make_shared<llvm::IRBuilder<>>(block);
 
-        IRGenerator<TNumber> generator(llvmModule, llvmContext, function, builder, functionMap,
-                                       isMainFunction);
+        IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
+            llvmModule, llvmContext, function, builder, functionMap, isMainFunction);
         generator.BeginFunction();
         op->Accept(generator);
         generator.EndFunction();
@@ -195,7 +226,13 @@ void GenerateIR(const CompilationContext& context, const std::shared_ptr<Operato
     }
 }
 
-template<typename TNumber>
+struct InternalFunction
+{
+    llvm::FunctionType* type;
+    llvm::Value* address;
+};
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 class IRGeneratorBase : public OperatorVisitor
 {
 protected:
@@ -206,6 +243,8 @@ protected:
     std::unordered_map<std::string, llvm::Function*> functionMap;
     bool isMainFunction;
 
+    InternalFunction printChar, loadVariable, storeVariable, loadArray, storeArray;
+
 public:
     IRGeneratorBase(llvm::Module* module, llvm::LLVMContext* context, llvm::Function* function,
                     const std::shared_ptr<llvm::IRBuilder<>>& builder,
@@ -214,20 +253,45 @@ public:
         : module(module), context(context), function(function), builder(builder),
           functionMap(functionMap), isMainFunction(isMainFunction)
     {
+#define GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, ...)                                                   \
+    llvm::FunctionType::get(RETURN_TYPE, { __VA_ARGS__ }, false)
+
+#define GET_LLVM_FUNCTION_ADDRESS(NAME)                                                            \
+    this->builder->getIntN(                                                                        \
+        IntegerBits<void*>,                                                                        \
+        reinterpret_cast<uint64_t>(&NAME<TNumber, TVariableSource, TGlobalArraySource, TPrinter>))
+
+#define GET_INTERNAL_FUNCTION(NAME, RETURN_TYPE, ...)                                              \
+    { GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, __VA_ARGS__), GET_LLVM_FUNCTION_ADDRESS(NAME) }
+
+        llvm::Type* voidType = llvm::Type::getVoidTy(*this->context);
+        llvm::Type* voidPointerType = voidType->getPointerTo(0);
+        llvm::Type* integerType = builder->getIntNTy(IntegerBits<TNumber>);
+        llvm::Type* stringType = builder->getInt8Ty()->getPointerTo(0);
+
+        printChar = GET_INTERNAL_FUNCTION(PrintChar, llvm::Type::getVoidTy(*this->context),
+                                          { voidPointerType, this->builder->getInt8Ty() });
+        loadVariable =
+            GET_INTERNAL_FUNCTION(LoadVariable, integerType, { voidPointerType, stringType });
+        storeVariable = GET_INTERNAL_FUNCTION(StoreVariable, voidType,
+                                              { voidPointerType, stringType, integerType });
+        loadArray = GET_INTERNAL_FUNCTION(LoadArray, integerType, { voidPointerType, integerType });
+        storeArray = GET_INTERNAL_FUNCTION(StoreArray, voidType,
+                                           { voidPointerType, integerType, integerType });
     }
 
     virtual void BeginFunction() = 0;
     virtual void EndFunction() = 0;
 };
 
-template<typename TNumber>
-class IRGenerator : public IRGeneratorBase<TNumber>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+class IRGenerator : public IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TPrinter>
 {
 private:
     llvm::Value* value;
 
 public:
-    using IRGeneratorBase<TNumber>::IRGeneratorBase;
+    using IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TPrinter>::IRGeneratorBase;
 
     virtual void BeginFunction() override {}
 
@@ -249,6 +313,7 @@ public:
     virtual void Visit(const OperandOperator& op) override
     {
         auto it = this->function->arg_begin();
+        it++; // ExecutionState
         for (int i = 0; i < op.GetIndex(); i++)
         {
             ++it;
@@ -264,17 +329,27 @@ public:
 
     virtual void Visit(const LoadVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        llvm::GlobalVariable* variableName =
+            this->builder->CreateGlobalString(op.GetVariableName());
+        this->value = this->builder->CreateCall(this->loadVariable.type, this->loadVariable.address,
+                                                { &*this->function->arg_begin(), variableName });
     };
 
     virtual void Visit(const LoadArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetIndex()->Accept(*this);
+        auto index = value;
+        this->value = this->builder->CreateCall(this->loadArray.type, this->loadArray.address,
+                                                { &*this->function->arg_begin(), index });
     };
 
     virtual void Visit(const PrintCharOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetCharacter()->Accept(*this);
+        auto casted = this->builder->CreateTrunc(value, llvm::Type::getInt8Ty(*this->context));
+        this->builder->CreateCall(this->printChar.type, this->printChar.address,
+                                  { &*this->function->arg_begin(), casted });
+        this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     };
 
     virtual void Visit(const ParenthesisOperator& op) override
@@ -299,12 +374,24 @@ public:
 
     virtual void Visit(const StoreVariableOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetOperand()->Accept(*this);
+        llvm::GlobalVariable* variableName =
+            this->builder->CreateGlobalString(op.GetVariableName());
+        this->builder->CreateCall(this->storeVariable.type, this->storeVariable.address,
+                                  { &*this->function->arg_begin(), variableName, value });
     }
 
     virtual void Visit(const StoreArrayOperator& op) override
     {
-        throw std::string("Not implemented");
+        op.GetValue()->Accept(*this);
+        auto valueToBeStored = value;
+
+        op.GetIndex()->Accept(*this);
+        auto index = value;
+
+        this->builder->CreateCall(this->storeArray.type, this->storeArray.address,
+                                  { &*this->function->arg_begin(), index, valueToBeStored });
+        this->value = valueToBeStored;
     }
 
     virtual void Visit(const BinaryOperator& op) override
@@ -400,8 +487,9 @@ public:
         auto oldBuilder = this->builder;
         auto Core = [this, temp](llvm::BasicBlock* block, const std::shared_ptr<Operator>& op) {
             auto builder = std::make_shared<llvm::IRBuilder<>>(block);
-            IRGenerator<TNumber> generator(this->module, this->context, this->function, builder,
-                                           this->functionMap, this->isMainFunction);
+            IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
+                this->module, this->context, this->function, builder, this->functionMap,
+                this->isMainFunction);
             op->Accept(generator);
             generator.builder->CreateStore(generator.value, temp);
             return (this->builder = generator.builder);
@@ -424,12 +512,14 @@ public:
 
     virtual void Visit(const UserDefinedOperator& op) override
     {
-        std::vector<llvm::Value*> arguments(op.GetOperands().size());
+        std::vector<llvm::Value*> arguments(op.GetOperands().size() + 1 /* ExecutionState */);
+        arguments[0] = &*this->function->arg_begin();
+
         auto operands = op.GetOperands();
         for (size_t i = 0; i < operands.size(); i++)
         {
             operands[i]->Accept(*this);
-            arguments[i] = this->value;
+            arguments[i + 1] = this->value;
         }
 
         this->value =
@@ -442,4 +532,46 @@ private:
         return this->builder->getIntNTy(IntegerBits<TNumber>);
     }
 };
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void PrintChar(void* state, char c)
+{
+    reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+        ->PrintChar(c);
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+TNumber LoadVariable(void* state, const char* variableName)
+{
+    return reinterpret_cast<
+               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+        ->GetVariableSource()
+        .Get(variableName);
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void StoreVariable(void* state, const char* variableName, TNumber value)
+{
+    reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+        ->GetVariableSource()
+        .Set(variableName, value);
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+TNumber LoadArray(void* state, TNumber index)
+{
+    return reinterpret_cast<
+               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+        ->GetArraySource()
+        .Get(index);
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void StoreArray(void* state, TNumber index, TNumber value)
+{
+    return reinterpret_cast<
+               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+        ->GetArraySource()
+        .Set(index, value);
 }

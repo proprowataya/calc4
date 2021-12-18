@@ -154,7 +154,7 @@ void TestOne(TestCase test, TestResult& testResult)
                 {
                     if (jit)
                     {
-                        result = EvaluateByJIT<TNumber>(context, op, optimize, false);
+                        result = EvaluateByJIT<TNumber>(context, state, op, optimize, false);
                     }
                     else
                     {

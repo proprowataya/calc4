@@ -335,7 +335,7 @@ void ReplCore(Option& option)
             {
                 result = (option.executionType == ExecutionType::JIT &&
                           (option.alwaysJit || HasRecursiveCall(*op, context)))
-                    ? EvaluateByJIT<TNumber>(context, op, option.optimize, option.printInfo)
+                    ? EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo)
                     : Evaluate<TNumber>(context, state, op);
             }
             clock_t end = clock();
