@@ -270,7 +270,11 @@ void RunAsRepl(Option& option)
     {
         string line;
         cout << "> ";
-        getline(cin, line);
+        if (!getline(cin, line))
+        {
+            // Reached EOF
+            break;
+        }
 
         if (line == "#print on")
         {
