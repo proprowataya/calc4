@@ -13,6 +13,7 @@
 #include <limits>
 #include <sstream>
 #include <streambuf>
+#include <string_view>
 
 constexpr const char* ProgramName = "Calc4 REPL";
 constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
@@ -34,17 +35,17 @@ struct Option
 
 namespace CommandLineArgs
 {
-constexpr const char* Help = "--help";
-constexpr const char* PerformTest = "--test";
-constexpr const char* EnableJit = "--jit-on";
-constexpr const char* DisableJit = "--jit-off";
-constexpr const char* AlwaysJit = "--always-jit";
-constexpr const char* AlwaysJitShort = "-a";
-constexpr const char* IntegerSize = "--size";
-constexpr const char* IntegerSizeShort = "-s";
-constexpr const char* EnableOptimization = "-O";
-constexpr const char* DisableOptimization = "-Od";
-constexpr const char* InfinitePrecisionInteger = "inf";
+constexpr std::string_view Help = "--help";
+constexpr std::string_view PerformTest = "--test";
+constexpr std::string_view EnableJit = "--jit-on";
+constexpr std::string_view DisableJit = "--jit-off";
+constexpr std::string_view AlwaysJit = "--always-jit";
+constexpr std::string_view AlwaysJitShort = "-a";
+constexpr std::string_view IntegerSize = "--size";
+constexpr std::string_view IntegerSizeShort = "-s";
+constexpr std::string_view EnableOptimization = "-O";
+constexpr std::string_view DisableOptimization = "-Od";
+constexpr std::string_view InfinitePrecisionInteger = "inf";
 }
 
 std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc, char** argv);
@@ -62,7 +63,6 @@ template<typename TNumber>
 void ExecuteCore(const std::string& source, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option);
 
-inline bool StringEquals(const char* a, const char* b);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
 void PrintTree(const Operator& op, int depth);
@@ -140,35 +140,34 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
 
         try
         {
-            if (StringEquals(str, CommandLineArgs::Help))
+            if (str == CommandLineArgs::Help)
             {
                 PrintHelp(argc, argv);
                 exit(0);
             }
-            else if (StringEquals(str, CommandLineArgs::PerformTest))
+            else if (str == CommandLineArgs::PerformTest)
             {
                 performTest = true;
             }
-            else if (StringEquals(str, CommandLineArgs::EnableJit))
+            else if (str == CommandLineArgs::EnableJit)
             {
                 option.executionType = ExecutionType::JIT;
             }
-            else if (StringEquals(str, CommandLineArgs::DisableJit))
+            else if (str == CommandLineArgs::DisableJit)
             {
                 option.executionType = ExecutionType::Interpreter;
             }
-            else if (StringEquals(str, CommandLineArgs::AlwaysJit) ||
-                     StringEquals(str, CommandLineArgs::AlwaysJitShort))
+            else if (str == CommandLineArgs::AlwaysJit || str == CommandLineArgs::AlwaysJitShort)
             {
                 option.alwaysJit = true;
             }
-            else if (StringEquals(str, CommandLineArgs::IntegerSize) ||
-                     StringEquals(str, CommandLineArgs::IntegerSizeShort))
+            else if (str == CommandLineArgs::IntegerSize ||
+                     str == CommandLineArgs::IntegerSizeShort)
             {
                 const char* arg = GetNextArgument();
                 int size;
 
-                if (StringEquals(arg, CommandLineArgs::InfinitePrecisionInteger))
+                if (arg == CommandLineArgs::InfinitePrecisionInteger)
                 {
                     size = (option.integerSize = InfinitePrecisionIntegerSize);
                 }
@@ -184,11 +183,11 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
                     throw oss.str();
                 }
             }
-            else if (StringEquals(str, CommandLineArgs::EnableOptimization))
+            else if (str == CommandLineArgs::EnableOptimization)
             {
                 option.optimize = true;
             }
-            else if (StringEquals(str, CommandLineArgs::DisableOptimization))
+            else if (str == CommandLineArgs::DisableOptimization)
             {
                 option.optimize = false;
             }
@@ -373,11 +372,6 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
     {
         cout << "Error: " << error << endl << endl;
     }
-}
-
-inline bool StringEquals(const char* a, const char* b)
-{
-    return strcmp(a, b) == 0;
 }
 
 inline bool IsSupportedIntegerSize(int size)
