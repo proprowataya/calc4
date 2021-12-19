@@ -331,24 +331,23 @@ public:
     {
         llvm::GlobalVariable* variableName =
             this->builder->CreateGlobalString(op.GetVariableName());
-        this->value = this->builder->CreateCall(this->loadVariable.type, this->loadVariable.address,
-                                                { &*this->function->arg_begin(), variableName });
+        this->value = CallInternalFunction(this->loadVariable,
+                                           { &*this->function->arg_begin(), variableName });
     };
 
     virtual void Visit(const LoadArrayOperator& op) override
     {
         op.GetIndex()->Accept(*this);
         auto index = value;
-        this->value = this->builder->CreateCall(this->loadArray.type, this->loadArray.address,
-                                                { &*this->function->arg_begin(), index });
+        this->value =
+            CallInternalFunction(this->loadArray, { &*this->function->arg_begin(), index });
     };
 
     virtual void Visit(const PrintCharOperator& op) override
     {
         op.GetCharacter()->Accept(*this);
         auto casted = this->builder->CreateTrunc(value, llvm::Type::getInt8Ty(*this->context));
-        this->builder->CreateCall(this->printChar.type, this->printChar.address,
-                                  { &*this->function->arg_begin(), casted });
+        CallInternalFunction(this->printChar, { &*this->function->arg_begin(), casted });
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     };
 
@@ -377,8 +376,8 @@ public:
         op.GetOperand()->Accept(*this);
         llvm::GlobalVariable* variableName =
             this->builder->CreateGlobalString(op.GetVariableName());
-        this->builder->CreateCall(this->storeVariable.type, this->storeVariable.address,
-                                  { &*this->function->arg_begin(), variableName, value });
+        CallInternalFunction(this->storeVariable,
+                             { &*this->function->arg_begin(), variableName, value });
     }
 
     virtual void Visit(const StoreArrayOperator& op) override
@@ -389,8 +388,8 @@ public:
         op.GetIndex()->Accept(*this);
         auto index = value;
 
-        this->builder->CreateCall(this->storeArray.type, this->storeArray.address,
-                                  { &*this->function->arg_begin(), index, valueToBeStored });
+        CallInternalFunction(this->storeArray,
+                             { &*this->function->arg_begin(), index, valueToBeStored });
         this->value = valueToBeStored;
     }
 
@@ -527,6 +526,15 @@ public:
     }
 
 private:
+    llvm::CallInst* CallInternalFunction(const InternalFunction& func,
+                                         llvm::ArrayRef<llvm::Value*> arguments)
+    {
+        auto functionPtr =
+            this->builder->CreateCast(llvm::Instruction::CastOps::IntToPtr, func.address,
+                                      llvm::PointerType::get(func.type, 0));
+        return this->builder->CreateCall(func.type, functionPtr, arguments);
+    }
+
     llvm::Type* GetIntegerType() const
     {
         return this->builder->getIntNTy(IntegerBits<TNumber>);
