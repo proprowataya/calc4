@@ -4,6 +4,7 @@
 #include "Optimizer.h"
 #include "SyntaxAnalysis.h"
 #include "Test.h"
+#include <chrono>
 #include <cstdint>
 #include <ctime>
 #include <fstream>
@@ -309,6 +310,8 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
 
     try
     {
+        auto start = chrono::high_resolution_clock::now();
+
         auto tokens = Lex(source, context);
         auto op = Parse(tokens, context);
         if (option.optimize)
@@ -343,7 +346,6 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
         }
 
         TNumber result;
-        clock_t start = clock();
         if constexpr (std::is_same_v<TNumber, mpz_class>)
         {
             // Jit compiler does not support GMP
@@ -356,10 +358,11 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
                 ? EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo)
                 : Evaluate<TNumber>(context, state, op);
         }
-        clock_t end = clock();
+        auto end = chrono::high_resolution_clock::now();
 
         cout << result << endl
-             << "Elapsed: " << (double)(end - start) / (CLOCKS_PER_SEC / 1000.0) << " ms" << endl
+             << "Elapsed: " << (chrono::duration<double>(end - start).count() * 1000) << " ms"
+             << endl
              << endl;
     }
     catch (std::string& error)
