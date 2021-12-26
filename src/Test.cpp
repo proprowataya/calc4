@@ -161,13 +161,15 @@ void TestOne(TestCase test, TestResult& testResult)
 #endif // ENABLE_JIT
              })
         {
-            try
-            {
+            auto PrintTestDescription = [&test, optimize, executor]() {
                 cout << "Testing for \"" << test.input
                      << "\" (optimize = " << (optimize ? "on" : "off")
                      << ", Executor = " << GetExecutorTypeDescription(executor)
                      << ", type = " << typeid(TNumber).name() << ") ";
+            };
 
+            try
+            {
                 CompilationContext context;
                 auto tokens = Lex(test.input, context);
                 auto op = Parse(tokens, context);
@@ -226,6 +228,7 @@ void TestOne(TestCase test, TestResult& testResult)
 
                 if (result != test.expected)
                 {
+                    PrintTestDescription();
                     cout << "---> [Failed] Expected: " << test.expected << ", Result: " << result
                          << endl;
                     testResult.fail++;
@@ -233,6 +236,7 @@ void TestOne(TestCase test, TestResult& testResult)
                 else if (consoleOutput !=
                          (test.expectedConsoleOutput != nullptr ? test.expectedConsoleOutput : ""))
                 {
+                    PrintTestDescription();
                     cout << "---> [Failed] Expected console output: " << test.expectedConsoleOutput
                          << ", Result: " << consoleOutput << endl;
                     testResult.fail++;
@@ -240,16 +244,17 @@ void TestOne(TestCase test, TestResult& testResult)
                 else
                 {
                     testResult.success++;
-                    cout << "---> [Success]" << endl;
                 }
             }
             catch (std::string& error)
             {
+                PrintTestDescription();
                 cout << "---> [Failed] Exception \"" << error << "\"" << endl;
                 testResult.fail++;
             }
             catch (std::exception& exception)
             {
+                PrintTestDescription();
                 cout << "---> [Failed] Exception \"" << exception.what() << "\"" << endl;
                 testResult.fail++;
             }
