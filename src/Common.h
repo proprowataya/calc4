@@ -7,11 +7,15 @@
 #include <string>
 #include <vector>
 
+#ifndef NDEBUG
+#define UNREACHABLE() assert(false)
+#else
 #ifdef _MSC_VER
 #define UNREACHABLE() __assume(false)
 #else
 #define UNREACHABLE() __builtin_unreachable()
 #endif // _MSC_VER
+#endif // !NDEBUG
 
 std::vector<std::string> Split(const std::string& str, char c);
 std::string TrimWhiteSpaces(const std::string& str);
