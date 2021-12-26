@@ -190,7 +190,7 @@ inline constexpr const char* ToString(StackMachineOpcode opcode)
 }
 
 template<typename TNumber>
-StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Operator>& op,
+StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<const Operator>& op,
                                                        const CompilationContext& context);
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,

@@ -11,8 +11,8 @@
 
 namespace
 {
-std::shared_ptr<Operator> ParseCore(const std::vector<std::shared_ptr<Token>>& tokens,
-                                    CompilationContext& context);
+std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Token>>& tokens,
+                                          CompilationContext& context);
 void GenerateUserDefinedCodes(const std::vector<std::shared_ptr<Token>>& tokens,
                               CompilationContext& context);
 
@@ -352,7 +352,7 @@ public:
         }
     }
 
-    std::pair<std::shared_ptr<Operator>, size_t> ParseOne()
+    std::pair<std::shared_ptr<const Operator>, size_t> ParseOne()
     {
         if (maxNumOperands == 0)
         {
@@ -361,7 +361,7 @@ public:
             return std::make_pair(std::move(op), index);
         }
 
-        std::vector<std::shared_ptr<Operator>> operands;
+        std::vector<std::shared_ptr<const Operator>> operands;
 
         /***** Extract tokens that take a few number of operands than current operator *****/
         auto lower = ReadLower();
@@ -386,7 +386,7 @@ public:
             operands.push_back(ParseCore(lower, context));
         }
 
-        std::shared_ptr<Operator> result = nullptr;
+        std::shared_ptr<const Operator> result = nullptr;
         while (index < tokens.size())
         {
             auto& token = tokens[index];
@@ -437,10 +437,10 @@ public:
     }
 };
 
-std::shared_ptr<Operator> ParseCore(const std::vector<std::shared_ptr<Token>>& tokens,
-                                    CompilationContext& context)
+std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Token>>& tokens,
+                                          CompilationContext& context)
 {
-    std::vector<std::shared_ptr<Operator>> operators;
+    std::vector<std::shared_ptr<const Operator>> operators;
 
     size_t index = 0;
     while (index < tokens.size())
@@ -490,8 +490,8 @@ std::vector<std::shared_ptr<Token>> Lex(const std::string& text, CompilationCont
     return result;
 }
 
-std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
-                                CompilationContext& context)
+std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
+                                      CompilationContext& context)
 {
     GenerateUserDefinedCodes(tokens, context);
     return ParseCore(tokens, context);

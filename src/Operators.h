@@ -33,20 +33,20 @@ class UserDefinedOperator;
 class OperatorVisitor
 {
 public:
-    virtual void Visit(const ZeroOperator& op) = 0;
-    virtual void Visit(const PrecomputedOperator& op) = 0;
-    virtual void Visit(const OperandOperator& op) = 0;
-    virtual void Visit(const DefineOperator& op) = 0;
-    virtual void Visit(const LoadVariableOperator& op) = 0;
-    virtual void Visit(const LoadArrayOperator& op) = 0;
-    virtual void Visit(const PrintCharOperator& op) = 0;
-    virtual void Visit(const ParenthesisOperator& op) = 0;
-    virtual void Visit(const DecimalOperator& op) = 0;
-    virtual void Visit(const StoreVariableOperator& op) = 0;
-    virtual void Visit(const StoreArrayOperator& op) = 0;
-    virtual void Visit(const BinaryOperator& op) = 0;
-    virtual void Visit(const ConditionalOperator& op) = 0;
-    virtual void Visit(const UserDefinedOperator& op) = 0;
+    virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const OperandOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const DefineOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const DecimalOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) = 0;
     virtual ~OperatorVisitor() = default;
 };
 
@@ -84,10 +84,11 @@ class OperatorImplement
 {
 private:
     OperatorDefinition definition;
-    std::shared_ptr<Operator> op;
+    std::shared_ptr<const Operator> op;
 
 public:
-    OperatorImplement(const OperatorDefinition& definition, const std::shared_ptr<Operator>& op)
+    OperatorImplement(const OperatorDefinition& definition,
+                      const std::shared_ptr<const Operator>& op)
         : definition(definition), op(op)
     {
     }
@@ -97,7 +98,7 @@ public:
         return definition;
     }
 
-    const std::shared_ptr<Operator>& GetOperator() const
+    const std::shared_ptr<const Operator>& GetOperator() const
     {
         return op;
     }
@@ -154,7 +155,7 @@ class Operator
 {
 public:
     virtual void Accept(OperatorVisitor& visitor) const = 0;
-    virtual std::vector<std::shared_ptr<Operator>> GetOperands() const = 0;
+    virtual std::vector<std::shared_ptr<const Operator>> GetOperands() const = 0;
     virtual std::string ToString() const = 0;
     virtual ~Operator() = default;
 };
@@ -162,16 +163,16 @@ public:
 #define MAKE_ACCEPT                                                                                \
     virtual void Accept(OperatorVisitor& visitor) const override                                   \
     {                                                                                              \
-        visitor.Visit(*this);                                                                      \
+        visitor.Visit(shared_from_this());                                                         \
     }
 
 #define MAKE_GET_OPERANDS(...)                                                                     \
-    virtual std::vector<std::shared_ptr<Operator>> GetOperands() const override                    \
+    virtual std::vector<std::shared_ptr<const Operator>> GetOperands() const override              \
     {                                                                                              \
-        return std::vector<std::shared_ptr<Operator>>({ __VA_ARGS__ });                            \
+        return std::vector<std::shared_ptr<const Operator>>({ __VA_ARGS__ });                      \
     }
 
-class ZeroOperator : public Operator
+class ZeroOperator : public Operator, public std::enable_shared_from_this<ZeroOperator>
 {
 public:
     virtual std::string ToString() const override
@@ -183,7 +184,8 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class PrecomputedOperator : public Operator
+class PrecomputedOperator : public Operator,
+                            public std::enable_shared_from_this<PrecomputedOperator>
 {
 private:
     AnyNumber value;
@@ -211,7 +213,7 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class OperandOperator : public Operator
+class OperandOperator : public Operator, public std::enable_shared_from_this<OperandOperator>
 {
 private:
     int index;
@@ -235,7 +237,7 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class DefineOperator : public Operator
+class DefineOperator : public Operator, public std::enable_shared_from_this<DefineOperator>
 {
 public:
     virtual std::string ToString() const override
@@ -247,7 +249,8 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class LoadVariableOperator : public Operator
+class LoadVariableOperator : public Operator,
+                             public std::enable_shared_from_this<LoadVariableOperator>
 {
 private:
     std::string variableName;
@@ -271,15 +274,15 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class LoadArrayOperator : public Operator
+class LoadArrayOperator : public Operator, public std::enable_shared_from_this<LoadArrayOperator>
 {
 private:
-    std::shared_ptr<Operator> index;
+    std::shared_ptr<const Operator> index;
 
 public:
-    LoadArrayOperator(const std::shared_ptr<Operator>& index) : index(index) {}
+    LoadArrayOperator(const std::shared_ptr<const Operator>& index) : index(index) {}
 
-    const std::shared_ptr<Operator>& GetIndex() const
+    const std::shared_ptr<const Operator>& GetIndex() const
     {
         return index;
     }
@@ -293,15 +296,15 @@ public:
     MAKE_GET_OPERANDS(index)
 };
 
-class PrintCharOperator : public Operator
+class PrintCharOperator : public Operator, public std::enable_shared_from_this<PrintCharOperator>
 {
 private:
-    std::shared_ptr<Operator> character;
+    std::shared_ptr<const Operator> character;
 
 public:
-    PrintCharOperator(const std::shared_ptr<Operator>& character) : character(character) {}
+    PrintCharOperator(const std::shared_ptr<const Operator>& character) : character(character) {}
 
-    const std::shared_ptr<Operator>& GetCharacter() const
+    const std::shared_ptr<const Operator>& GetCharacter() const
     {
         return character;
     }
@@ -315,22 +318,24 @@ public:
     MAKE_GET_OPERANDS(character)
 };
 
-class ParenthesisOperator : public Operator
+class ParenthesisOperator : public Operator,
+                            public std::enable_shared_from_this<ParenthesisOperator>
 {
 private:
-    std::vector<std::shared_ptr<Operator>> operators;
+    std::vector<std::shared_ptr<const Operator>> operators;
 
 public:
-    ParenthesisOperator(const std::vector<std::shared_ptr<Operator>>& operators)
+    ParenthesisOperator(const std::vector<std::shared_ptr<const Operator>>& operators)
         : operators(operators)
     {
     }
 
-    ParenthesisOperator(std::vector<std::shared_ptr<Operator>>&& operators) : operators(operators)
+    ParenthesisOperator(std::vector<std::shared_ptr<const Operator>>&& operators)
+        : operators(operators)
     {
     }
 
-    const std::vector<std::shared_ptr<Operator>>& GetOperators() const
+    const std::vector<std::shared_ptr<const Operator>>& GetOperators() const
     {
         return operators;
     }
@@ -346,19 +351,19 @@ public:
     MAKE_GET_OPERANDS()
 };
 
-class DecimalOperator : public Operator
+class DecimalOperator : public Operator, public std::enable_shared_from_this<DecimalOperator>
 {
 private:
-    std::shared_ptr<Operator> operand;
+    std::shared_ptr<const Operator> operand;
     int value;
 
 public:
-    DecimalOperator(const std::shared_ptr<Operator>& operand, int value)
+    DecimalOperator(const std::shared_ptr<const Operator>& operand, int value)
         : operand(operand), value(value)
     {
     }
 
-    const std::shared_ptr<Operator>& GetOperand() const
+    const std::shared_ptr<const Operator>& GetOperand() const
     {
         return operand;
     }
@@ -379,24 +384,27 @@ public:
     MAKE_GET_OPERANDS(operand)
 };
 
-class StoreVariableOperator : public Operator
+class StoreVariableOperator : public Operator,
+                              public std::enable_shared_from_this<StoreVariableOperator>
 {
 private:
-    std::shared_ptr<Operator> operand;
+    std::shared_ptr<const Operator> operand;
     std::string variableName;
 
 public:
-    StoreVariableOperator(const std::shared_ptr<Operator>& operand, const std::string& variableName)
+    StoreVariableOperator(const std::shared_ptr<const Operator>& operand,
+                          const std::string& variableName)
         : operand(operand), variableName(variableName)
     {
     }
 
-    StoreVariableOperator(const std::shared_ptr<Operator>& operand, std::string&& variableName)
+    StoreVariableOperator(const std::shared_ptr<const Operator>& operand,
+                          std::string&& variableName)
         : operand(operand), variableName(variableName)
     {
     }
 
-    const std::shared_ptr<Operator>& GetOperand() const
+    const std::shared_ptr<const Operator>& GetOperand() const
     {
         return operand;
     }
@@ -415,24 +423,24 @@ public:
     MAKE_GET_OPERANDS(operand)
 };
 
-class StoreArrayOperator : public Operator
+class StoreArrayOperator : public Operator, public std::enable_shared_from_this<StoreArrayOperator>
 {
 private:
-    std::shared_ptr<Operator> value, index;
+    std::shared_ptr<const Operator> value, index;
 
 public:
-    StoreArrayOperator(const std::shared_ptr<Operator>& value,
-                       const std::shared_ptr<Operator>& index)
+    StoreArrayOperator(const std::shared_ptr<const Operator>& value,
+                       const std::shared_ptr<const Operator>& index)
         : value(value), index(index)
     {
     }
 
-    const std::shared_ptr<Operator>& GetValue() const
+    const std::shared_ptr<const Operator>& GetValue() const
     {
         return value;
     }
 
-    const std::shared_ptr<Operator>& GetIndex() const
+    const std::shared_ptr<const Operator>& GetIndex() const
     {
         return index;
     }
@@ -461,15 +469,15 @@ enum class BinaryType
     GreaterThan
 };
 
-class BinaryOperator : public Operator
+class BinaryOperator : public Operator, public std::enable_shared_from_this<BinaryOperator>
 {
 private:
-    std::shared_ptr<Operator> left, right;
+    std::shared_ptr<const Operator> left, right;
     BinaryType type;
 
 public:
-    BinaryOperator(const std::shared_ptr<Operator>& left, const std::shared_ptr<Operator>& right,
-                   BinaryType type)
+    BinaryOperator(const std::shared_ptr<const Operator>& left,
+                   const std::shared_ptr<const Operator>& right, BinaryType type)
         : left(left), right(right), type(type)
     {
     }
@@ -479,12 +487,12 @@ public:
         return type;
     }
 
-    const std::shared_ptr<Operator>& GetLeft() const
+    const std::shared_ptr<const Operator>& GetLeft() const
     {
         return left;
     }
 
-    const std::shared_ptr<Operator>& GetRight() const
+    const std::shared_ptr<const Operator>& GetRight() const
     {
         return right;
     }
@@ -511,30 +519,31 @@ public:
     MAKE_GET_OPERANDS(left, right)
 };
 
-class ConditionalOperator : public Operator
+class ConditionalOperator : public Operator,
+                            public std::enable_shared_from_this<ConditionalOperator>
 {
 private:
-    std::shared_ptr<Operator> condition, ifTrue, ifFalse;
+    std::shared_ptr<const Operator> condition, ifTrue, ifFalse;
 
 public:
-    ConditionalOperator(const std::shared_ptr<Operator>& condition,
-                        const std::shared_ptr<Operator>& ifTrue,
-                        const std::shared_ptr<Operator>& ifFalse)
+    ConditionalOperator(const std::shared_ptr<const Operator>& condition,
+                        const std::shared_ptr<const Operator>& ifTrue,
+                        const std::shared_ptr<const Operator>& ifFalse)
         : condition(condition), ifTrue(ifTrue), ifFalse(ifFalse)
     {
     }
 
-    const std::shared_ptr<Operator>& GetCondition() const
+    const std::shared_ptr<const Operator>& GetCondition() const
     {
         return condition;
     }
 
-    const std::shared_ptr<Operator>& GetIfTrue() const
+    const std::shared_ptr<const Operator>& GetIfTrue() const
     {
         return ifTrue;
     }
 
-    const std::shared_ptr<Operator>& GetIfFalse() const
+    const std::shared_ptr<const Operator>& GetIfFalse() const
     {
         return ifFalse;
     }
@@ -548,21 +557,22 @@ public:
     MAKE_GET_OPERANDS(condition, ifTrue, ifFalse)
 };
 
-class UserDefinedOperator : public Operator
+class UserDefinedOperator : public Operator,
+                            public std::enable_shared_from_this<UserDefinedOperator>
 {
 private:
     OperatorDefinition definition;
-    std::vector<std::shared_ptr<Operator>> operands;
+    std::vector<std::shared_ptr<const Operator>> operands;
 
 public:
     UserDefinedOperator(const OperatorDefinition& definition,
-                        const std::vector<std::shared_ptr<Operator>>& operands)
+                        const std::vector<std::shared_ptr<const Operator>>& operands)
         : definition(definition), operands(operands)
     {
     }
 
     UserDefinedOperator(const OperatorDefinition& definition,
-                        std::vector<std::shared_ptr<Operator>>&& operands)
+                        std::vector<std::shared_ptr<const Operator>>&& operands)
         : definition(definition), operands(operands)
     {
     }
@@ -573,7 +583,7 @@ public:
     }
 
     // TODO:
-    std::vector<std::shared_ptr<Operator>> GetOperands() const override
+    std::vector<std::shared_ptr<const Operator>> GetOperands() const override
     {
         return operands;
     }

@@ -12,7 +12,7 @@ template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNum
          typename TPrinter = DefaultPrinter>
 TNumber Evaluate(const CompilationContext& context,
                  ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                 std::shared_ptr<Operator>& op)
+                 std::shared_ptr<const Operator>& op)
 {
     class Evaluator : public OperatorVisitor
     {
@@ -30,41 +30,41 @@ TNumber Evaluate(const CompilationContext& context,
         {
         }
 
-        virtual void Visit(const ZeroOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) override
         {
             value = 0;
         }
 
-        virtual void Visit(const PrecomputedOperator& op) override
+        virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) override
         {
-            value = op.GetValue<TNumber>();
+            value = op->GetValue<TNumber>();
         }
 
-        virtual void Visit(const OperandOperator& op) override
+        virtual void Visit(const std::shared_ptr<const OperandOperator>& op) override
         {
-            value = arguments.top()[op.GetIndex()];
+            value = arguments.top()[op->GetIndex()];
         };
 
-        virtual void Visit(const DefineOperator& op) override
+        virtual void Visit(const std::shared_ptr<const DefineOperator>& op) override
         {
             value = 0;
         };
 
-        virtual void Visit(const LoadVariableOperator& op) override
+        virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
         {
-            value = state->GetVariableSource().Get(op.GetVariableName());
+            value = state->GetVariableSource().Get(op->GetVariableName());
         };
 
-        virtual void Visit(const LoadArrayOperator& op) override
+        virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
         {
-            op.GetIndex()->Accept(*this);
+            op->GetIndex()->Accept(*this);
             auto index = value;
             value = state->GetArraySource().Get(index);
         };
 
-        virtual void Visit(const PrintCharOperator& op) override
+        virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
         {
-            op.GetCharacter()->Accept(*this);
+            op->GetCharacter()->Accept(*this);
 
             char c;
 #ifdef ENABLE_GMP
@@ -82,48 +82,48 @@ TNumber Evaluate(const CompilationContext& context,
             value = static_cast<TNumber>(0);
         };
 
-        virtual void Visit(const ParenthesisOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) override
         {
             value = 0;
 
-            for (auto& item : op.GetOperators())
+            for (auto& item : op->GetOperators())
             {
                 item->Accept(*this);
             }
         }
 
-        virtual void Visit(const DecimalOperator& op) override
+        virtual void Visit(const std::shared_ptr<const DecimalOperator>& op) override
         {
-            op.GetOperand()->Accept(*this);
-            value = value * 10 + op.GetValue();
+            op->GetOperand()->Accept(*this);
+            value = value * 10 + op->GetValue();
         }
 
-        virtual void Visit(const StoreVariableOperator& op) override
+        virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
         {
-            op.GetOperand()->Accept(*this);
-            state->GetVariableSource().Set(op.GetVariableName(), value);
+            op->GetOperand()->Accept(*this);
+            state->GetVariableSource().Set(op->GetVariableName(), value);
         }
 
-        virtual void Visit(const StoreArrayOperator& op) override
+        virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
         {
-            op.GetValue()->Accept(*this);
+            op->GetValue()->Accept(*this);
             auto valueToBeStored = value;
 
-            op.GetIndex()->Accept(*this);
+            op->GetIndex()->Accept(*this);
             auto index = value;
 
             state->GetArraySource().Set(index, valueToBeStored);
             value = valueToBeStored;
         }
 
-        virtual void Visit(const BinaryOperator& op) override
+        virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
         {
-            op.GetLeft()->Accept(*this);
+            op->GetLeft()->Accept(*this);
             auto left = value;
-            op.GetRight()->Accept(*this);
+            op->GetRight()->Accept(*this);
             auto right = value;
 
-            switch (op.GetType())
+            switch (op->GetType())
             {
             case BinaryType::Add:
                 value = left + right;
@@ -164,30 +164,30 @@ TNumber Evaluate(const CompilationContext& context,
             }
         }
 
-        virtual void Visit(const ConditionalOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
         {
-            op.GetCondition()->Accept(*this);
+            op->GetCondition()->Accept(*this);
 
             if (value != 0)
             {
-                op.GetIfTrue()->Accept(*this);
+                op->GetIfTrue()->Accept(*this);
             }
             else
             {
-                op.GetIfFalse()->Accept(*this);
+                op->GetIfFalse()->Accept(*this);
             }
         };
 
-        virtual void Visit(const UserDefinedOperator& op) override
+        virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
         {
-            size_t size = op.GetDefinition().GetNumOperands();
+            size_t size = op->GetDefinition().GetNumOperands();
             TNumber* arg =
 #ifdef ENABLE_GMP
                 std::is_same<TNumber, mpz_class>::value ? new TNumber[size] :
 #endif // ENABLE_GMP
                                                         STACK_ALLOC(TNumber, size);
 
-            auto operands = op.GetOperands();
+            auto operands = op->GetOperands();
             for (size_t i = 0; i < size; i++)
             {
                 operands[i]->Accept(*this);
@@ -195,7 +195,7 @@ TNumber Evaluate(const CompilationContext& context,
             }
 
             arguments.push(arg);
-            context->GetOperatorImplement(op.GetDefinition().GetName())
+            context->GetOperatorImplement(op->GetDefinition().GetName())
                 .GetOperator()
                 ->Accept(*this);
             arguments.pop();

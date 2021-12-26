@@ -14,15 +14,15 @@ class Visitor : public OperatorVisitor
 private:
     CompilationContext& context;
 
-    std::shared_ptr<Operator> Precompute(const std::shared_ptr<Operator>& op)
+    std::shared_ptr<const Operator> Precompute(const std::shared_ptr<const Operator>& op)
     {
         op->Accept(*this);
         return value;
     }
 
-    bool TryGetPrecomputedValue(const std::shared_ptr<Operator>& op, TNumber* dest)
+    bool TryGetPrecomputedValue(const std::shared_ptr<const Operator>& op, TNumber* dest)
     {
-        if (auto precomputed = dynamic_cast<const PrecomputedOperator*>(op.get()))
+        if (auto precomputed = std::dynamic_pointer_cast<const PrecomputedOperator>(op))
         {
             *dest = precomputed->GetValue<TNumber>();
             return true;
@@ -34,58 +34,55 @@ private:
     }
 
 public:
-    std::shared_ptr<Operator> value;
+    std::shared_ptr<const Operator> value;
 
     Visitor(CompilationContext& context) : context(context) {}
 
-    virtual void Visit(const ZeroOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) override
     {
         value = std::make_shared<PrecomputedOperator>(static_cast<TNumber>(0));
     };
 
-    virtual void Visit(const PrecomputedOperator& op) override
+    virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) override
     {
-        // TODO:
-        value = std::make_shared<PrecomputedOperator>(op.GetValue<TNumber>());
+        value = op;
     };
 
-    virtual void Visit(const OperandOperator& op) override
+    virtual void Visit(const std::shared_ptr<const OperandOperator>& op) override
     {
-        // TODO:
-        value = std::make_shared<OperandOperator>(op.GetIndex());
+        value = op;
     };
 
-    virtual void Visit(const DefineOperator& op) override
+    virtual void Visit(const std::shared_ptr<const DefineOperator>& op) override
     {
         value = std::make_shared<PrecomputedOperator>(static_cast<TNumber>(0));
     };
 
-    virtual void Visit(const LoadVariableOperator& op) override
+    virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
     {
-        // TODO:
-        value = std::make_shared<LoadVariableOperator>(op.GetVariableName());
+        value = op;
     };
 
-    virtual void Visit(const LoadArrayOperator& op) override
+    virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
     {
-        std::shared_ptr<Operator> index = Precompute(op.GetIndex());
+        std::shared_ptr<const Operator> index = Precompute(op->GetIndex());
         value = std::make_shared<LoadArrayOperator>(index);
     };
 
-    virtual void Visit(const PrintCharOperator& op) override
+    virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
     {
-        std::shared_ptr<Operator> character = Precompute(op.GetCharacter());
+        std::shared_ptr<const Operator> character = Precompute(op->GetCharacter());
         value = std::make_shared<PrintCharOperator>(character);
     };
 
-    virtual void Visit(const ParenthesisOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) override
     {
-        std::vector<std::shared_ptr<Operator>> optimized;
+        std::vector<std::shared_ptr<const Operator>> optimized;
         bool allPrecomputed = true;
 
-        for (auto& op2 : op.GetOperators())
+        for (auto& op2 : op->GetOperators())
         {
-            std::shared_ptr<Operator> precomputed = Precompute(op2);
+            std::shared_ptr<const Operator> precomputed = Precompute(op2);
             optimized.push_back(op2);
 
             if (dynamic_cast<const PrecomputedOperator*>(precomputed.get()) == nullptr)
@@ -104,45 +101,45 @@ public:
         }
     };
 
-    virtual void Visit(const DecimalOperator& op) override
+    virtual void Visit(const std::shared_ptr<const DecimalOperator>& op) override
     {
-        std::shared_ptr<Operator> precomputed = Precompute(op.GetOperand());
+        std::shared_ptr<const Operator> precomputed = Precompute(op->GetOperand());
         TNumber precomputedValue;
         if (TryGetPrecomputedValue(precomputed, &precomputedValue))
         {
             value = std::make_shared<PrecomputedOperator>(
-                static_cast<TNumber>(precomputedValue * 10 + op.GetValue()));
+                static_cast<TNumber>(precomputedValue * 10 + op->GetValue()));
         }
         else
         {
-            value = std::make_shared<DecimalOperator>(precomputed, op.GetValue());
+            value = std::make_shared<DecimalOperator>(precomputed, op->GetValue());
         }
     };
 
-    virtual void Visit(const StoreVariableOperator& op) override
+    virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
     {
-        std::shared_ptr<Operator> operand = Precompute(op.GetOperand());
-        value = std::make_shared<StoreVariableOperator>(operand, op.GetVariableName());
+        std::shared_ptr<const Operator> operand = Precompute(op->GetOperand());
+        value = std::make_shared<StoreVariableOperator>(operand, op->GetVariableName());
     }
 
-    virtual void Visit(const StoreArrayOperator& op) override
+    virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
     {
-        std::shared_ptr<Operator> valueToBeStored = Precompute(op.GetValue());
-        std::shared_ptr<Operator> index = Precompute(op.GetIndex());
+        std::shared_ptr<const Operator> valueToBeStored = Precompute(op->GetValue());
+        std::shared_ptr<const Operator> index = Precompute(op->GetIndex());
         value = std::make_shared<StoreArrayOperator>(valueToBeStored, index);
     }
 
-    virtual void Visit(const BinaryOperator& op) override
+    virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
     {
-        std::shared_ptr<Operator> left = Precompute(op.GetLeft());
-        std::shared_ptr<Operator> right = Precompute(op.GetRight());
+        std::shared_ptr<const Operator> left = Precompute(op->GetLeft());
+        std::shared_ptr<const Operator> right = Precompute(op->GetRight());
 
         TNumber leftValue, rightValue;
         if (TryGetPrecomputedValue(left, &leftValue) && TryGetPrecomputedValue(right, &rightValue))
         {
             TNumber result;
 
-            switch (op.GetType())
+            switch (op->GetType())
             {
             case BinaryType::Add:
                 result = leftValue + rightValue;
@@ -186,15 +183,15 @@ public:
         }
         else
         {
-            value = std::make_shared<BinaryOperator>(left, right, op.GetType());
+            value = std::make_shared<BinaryOperator>(left, right, op->GetType());
         }
     };
 
-    virtual void Visit(const ConditionalOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
     {
-        std::shared_ptr<Operator> condition = Precompute(op.GetCondition());
-        std::shared_ptr<Operator> ifTrue = Precompute(op.GetIfTrue());
-        std::shared_ptr<Operator> ifFalse = Precompute(op.GetIfFalse());
+        std::shared_ptr<const Operator> condition = Precompute(op->GetCondition());
+        std::shared_ptr<const Operator> ifTrue = Precompute(op->GetIfTrue());
+        std::shared_ptr<const Operator> ifFalse = Precompute(op->GetIfFalse());
 
         TNumber conditionValue;
         if (TryGetPrecomputedValue(condition, &conditionValue))
@@ -207,24 +204,25 @@ public:
         }
     };
 
-    virtual void Visit(const UserDefinedOperator& op) override
+    virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
     {
-        std::vector<std::shared_ptr<Operator>> operands;
+        std::vector<std::shared_ptr<const Operator>> operands;
 
-        for (auto& op2 : op.GetOperands())
+        for (auto& op2 : op->GetOperands())
         {
             operands.push_back(Precompute(op2));
         }
 
-        value = std::make_shared<UserDefinedOperator>(op.GetDefinition(), std::move(operands));
+        value = std::make_shared<UserDefinedOperator>(op->GetDefinition(), std::move(operands));
     };
 };
 }
 
 template<typename TNumber>
-std::shared_ptr<Operator> Optimize(CompilationContext& context, const std::shared_ptr<Operator>& op)
+std::shared_ptr<const Operator> Optimize(CompilationContext& context,
+                                         const std::shared_ptr<const Operator>& op)
 {
-    auto OptimizeCore = [&context](const std::shared_ptr<Operator>& op) {
+    auto OptimizeCore = [&context](const std::shared_ptr<const Operator>& op) {
         Visitor<TNumber> visitor(context);
         op->Accept(visitor);
         return visitor.value;
@@ -232,24 +230,24 @@ std::shared_ptr<Operator> Optimize(CompilationContext& context, const std::share
 
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
     {
-        std::shared_ptr<Operator> optimized = OptimizeCore(it->second.GetOperator());
+        std::shared_ptr<const Operator> optimized = OptimizeCore(it->second.GetOperator());
         context.AddOperatorImplement(OperatorImplement(it->second.GetDefinition(), optimized));
     }
 
     return OptimizeCore(op);
 }
 
-template std::shared_ptr<Operator> Optimize<int32_t>(CompilationContext& context,
-                                                     const std::shared_ptr<Operator>& op);
-template std::shared_ptr<Operator> Optimize<int64_t>(CompilationContext& context,
-                                                     const std::shared_ptr<Operator>& op);
+template std::shared_ptr<const Operator> Optimize<int32_t>(
+    CompilationContext& context, const std::shared_ptr<const Operator>& op);
+template std::shared_ptr<const Operator> Optimize<int64_t>(
+    CompilationContext& context, const std::shared_ptr<const Operator>& op);
 
 #ifdef ENABLE_INT128
-template std::shared_ptr<Operator> Optimize<__int128_t>(CompilationContext& context,
-                                                        const std::shared_ptr<Operator>& op);
+template std::shared_ptr<const Operator> Optimize<__int128_t>(
+    CompilationContext& context, const std::shared_ptr<const Operator>& op);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
-template std::shared_ptr<Operator> Optimize<mpz_class>(CompilationContext& context,
-                                                       const std::shared_ptr<Operator>& op);
+template std::shared_ptr<const Operator> Optimize<mpz_class>(
+    CompilationContext& context, const std::shared_ptr<const Operator>& op);
 #endif // ENABLE_GMP

@@ -41,7 +41,7 @@
         const CompilationContext& context,                                                         \
         ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
                        TPrinter>& state,                                                           \
-        const std::shared_ptr<Operator>& op, bool optimize, bool printInfo)
+        const std::shared_ptr<const Operator>& op, bool optimize, bool printInfo)
 
 InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
@@ -63,7 +63,7 @@ size_t IntegerBits = sizeof(TNumber) * 8;
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 void GenerateIR(const CompilationContext& context,
                 ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                const std::shared_ptr<Operator>& op, llvm::LLVMContext* llvmContext,
+                const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
                 llvm::Module* llvmModule);
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
@@ -88,7 +88,7 @@ void StoreArray(void* state, TNumber index, TNumber value);
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 TNumber EvaluateByJIT(const CompilationContext& context,
                       ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<Operator>& op, bool optimize, bool printInfo)
+                      const std::shared_ptr<const Operator>& op, bool optimize, bool printInfo)
 {
     using namespace llvm;
     LLVMContext Context;
@@ -173,7 +173,7 @@ namespace
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 void GenerateIR(const CompilationContext& context,
                 ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                const std::shared_ptr<Operator>& op, llvm::LLVMContext* llvmContext,
+                const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
                 llvm::Module* llvmModule)
 {
     /* ***** Initialize variables ***** */
@@ -208,7 +208,7 @@ void GenerateIR(const CompilationContext& context,
     /* ***** Generate IR ****** */
     // Local helper function
     auto Emit = [llvmModule, llvmContext, &functionMap](llvm::Function* function,
-                                                        const std::shared_ptr<Operator>& op,
+                                                        const std::shared_ptr<const Operator>& op,
                                                         bool isMainFunction) {
         llvm::BasicBlock* block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         auto builder = std::make_shared<llvm::IRBuilder<>>(block);
@@ -306,21 +306,21 @@ public:
         this->builder->CreateRet(this->value);
     }
 
-    virtual void Visit(const ZeroOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) override
     {
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     }
 
-    virtual void Visit(const PrecomputedOperator& op) override
+    virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) override
     {
-        this->value = llvm::ConstantInt::getSigned(GetIntegerType(), op.GetValue<TNumber>());
+        this->value = llvm::ConstantInt::getSigned(GetIntegerType(), op->GetValue<TNumber>());
     }
 
-    virtual void Visit(const OperandOperator& op) override
+    virtual void Visit(const std::shared_ptr<const OperandOperator>& op) override
     {
         auto it = this->function->arg_begin();
         it++; // ExecutionState
-        for (int i = 0; i < op.GetIndex(); i++)
+        for (int i = 0; i < op->GetIndex(); i++)
         {
             ++it;
         }
@@ -328,70 +328,70 @@ public:
         this->value = &*it;
     }
 
-    virtual void Visit(const DefineOperator& op) override
+    virtual void Visit(const std::shared_ptr<const DefineOperator>& op) override
     {
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     }
 
-    virtual void Visit(const LoadVariableOperator& op) override
+    virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
     {
         llvm::GlobalVariable* variableName =
-            this->builder->CreateGlobalString(op.GetVariableName());
+            this->builder->CreateGlobalString(op->GetVariableName());
         this->value = CallInternalFunction(this->loadVariable,
                                            { &*this->function->arg_begin(), variableName });
     };
 
-    virtual void Visit(const LoadArrayOperator& op) override
+    virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
     {
-        op.GetIndex()->Accept(*this);
+        op->GetIndex()->Accept(*this);
         auto index = value;
         this->value =
             CallInternalFunction(this->loadArray, { &*this->function->arg_begin(), index });
     };
 
-    virtual void Visit(const PrintCharOperator& op) override
+    virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
     {
-        op.GetCharacter()->Accept(*this);
+        op->GetCharacter()->Accept(*this);
         auto casted = this->builder->CreateTrunc(value, llvm::Type::getInt8Ty(*this->context));
         CallInternalFunction(this->printChar, { &*this->function->arg_begin(), casted });
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     };
 
-    virtual void Visit(const ParenthesisOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) override
     {
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
-        for (auto& item : op.GetOperators())
+        for (auto& item : op->GetOperators())
         {
             item->Accept(*this);
         }
     }
 
-    virtual void Visit(const DecimalOperator& op) override
+    virtual void Visit(const std::shared_ptr<const DecimalOperator>& op) override
     {
-        op.GetOperand()->Accept(*this);
+        op->GetOperand()->Accept(*this);
         auto operand = this->value;
 
         auto multed =
             this->builder->CreateMul(operand, this->builder->getIntN(IntegerBits<TNumber>, 10));
         this->value = this->builder->CreateAdd(
-            multed, this->builder->getIntN(IntegerBits<TNumber>, op.GetValue()));
+            multed, this->builder->getIntN(IntegerBits<TNumber>, op->GetValue()));
     }
 
-    virtual void Visit(const StoreVariableOperator& op) override
+    virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
     {
-        op.GetOperand()->Accept(*this);
+        op->GetOperand()->Accept(*this);
         llvm::GlobalVariable* variableName =
-            this->builder->CreateGlobalString(op.GetVariableName());
+            this->builder->CreateGlobalString(op->GetVariableName());
         CallInternalFunction(this->storeVariable,
                              { &*this->function->arg_begin(), variableName, value });
     }
 
-    virtual void Visit(const StoreArrayOperator& op) override
+    virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
     {
-        op.GetValue()->Accept(*this);
+        op->GetValue()->Accept(*this);
         auto valueToBeStored = value;
 
-        op.GetIndex()->Accept(*this);
+        op->GetIndex()->Accept(*this);
         auto index = value;
 
         CallInternalFunction(this->storeArray,
@@ -399,14 +399,14 @@ public:
         this->value = valueToBeStored;
     }
 
-    virtual void Visit(const BinaryOperator& op) override
+    virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
     {
-        op.GetLeft()->Accept(*this);
+        op->GetLeft()->Accept(*this);
         auto left = this->value;
-        op.GetRight()->Accept(*this);
+        op->GetRight()->Accept(*this);
         auto right = this->value;
 
-        switch (op.GetType())
+        switch (op->GetType())
         {
         case BinaryType::Add:
             this->value = this->builder->CreateAdd(left, right);
@@ -477,12 +477,12 @@ public:
         }
     }
 
-    virtual void Visit(const ConditionalOperator& op) override
+    virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
     {
         /* ***** Evaluate condition expression ***** */
         llvm::Value* temp =
             this->builder->CreateAlloca(this->builder->getIntNTy(IntegerBits<TNumber>));
-        op.GetCondition()->Accept(*this);
+        op->GetCondition()->Accept(*this);
         llvm::Value* cond = this->builder->CreateSelect(
             this->builder->CreateICmpNE(this->value,
                                         this->builder->getIntN(IntegerBits<TNumber>, 0)),
@@ -490,7 +490,8 @@ public:
 
         /* ***** Generate if-true and if-false codes ***** */
         auto oldBuilder = this->builder;
-        auto Core = [this, temp](llvm::BasicBlock* block, const std::shared_ptr<Operator>& op) {
+        auto Core = [this, temp](llvm::BasicBlock* block,
+                                 const std::shared_ptr<const Operator>& op) {
             auto builder = std::make_shared<llvm::IRBuilder<>>(block);
             IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
                 this->module, this->context, this->function, builder, this->functionMap,
@@ -501,9 +502,9 @@ public:
         };
 
         llvm::BasicBlock* ifTrue = llvm::BasicBlock::Create(*this->context, "", this->function);
-        auto ifTrueBuilder = Core(ifTrue, op.GetIfTrue());
+        auto ifTrueBuilder = Core(ifTrue, op->GetIfTrue());
         llvm::BasicBlock* ifFalse = llvm::BasicBlock::Create(*this->context, "", this->function);
-        auto ifFalseBuilder = Core(ifFalse, op.GetIfFalse());
+        auto ifFalseBuilder = Core(ifFalse, op->GetIfFalse());
 
         /* ***** Emit branch operation ***** */
         llvm::BasicBlock* finalBlock = llvm::BasicBlock::Create(*this->context, "", this->function);
@@ -515,12 +516,12 @@ public:
         this->value = this->builder->CreateLoad(this->GetIntegerType(), temp);
     }
 
-    virtual void Visit(const UserDefinedOperator& op) override
+    virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
     {
-        std::vector<llvm::Value*> arguments(op.GetOperands().size() + 1 /* ExecutionState */);
+        std::vector<llvm::Value*> arguments(op->GetOperands().size() + 1 /* ExecutionState */);
         arguments[0] = &*this->function->arg_begin();
 
-        auto operands = op.GetOperands();
+        auto operands = op->GetOperands();
         for (size_t i = 0; i < operands.size(); i++)
         {
             operands[i]->Accept(*this);
@@ -528,7 +529,7 @@ public:
         }
 
         this->value =
-            this->builder->CreateCall(this->functionMap[op.GetDefinition().GetName()], arguments);
+            this->builder->CreateCall(this->functionMap[op->GetDefinition().GetName()], arguments);
     }
 
 private:

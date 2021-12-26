@@ -17,7 +17,7 @@
 
 #define InstantiateGenerateStackMachineModule(TNumber)                                             \
     template StackMachineModule<TNumber> GenerateStackMachineModule(                               \
-        const std::shared_ptr<Operator>& op, const CompilationContext& context)
+        const std::shared_ptr<const Operator>& op, const CompilationContext& context)
 
 InstantiateGenerateStackMachineModule(int32_t);
 InstantiateGenerateStackMachineModule(int64_t);
@@ -140,7 +140,7 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
 }
 
 template<typename TNumber>
-StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Operator>& op,
+StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<const Operator>& op,
                                                        const CompilationContext& context)
 {
     static constexpr int OperatorBeginLabel = 0;
@@ -168,7 +168,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
         {
         }
 
-        void Generate(const std::shared_ptr<Operator>& op)
+        void Generate(const std::shared_ptr<const Operator>& op)
         {
             assert(nextLabel == OperatorBeginLabel);
             AddOperation(StackMachineOpcode::Lavel, nextLabel++);
@@ -234,14 +234,14 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
             operations = std::move(newVector);
         }
 
-        virtual void Visit(const ZeroOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) override
         {
             AddOperation(StackMachineOpcode::LoadConst, 0);
         }
 
-        virtual void Visit(const PrecomputedOperator& op) override
+        virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) override
         {
-            auto value = op.GetValue<TNumber>();
+            auto value = op->GetValue<TNumber>();
 
             StackMachineOperation::ValueType casted;
 #ifdef ENABLE_GMP
@@ -271,39 +271,39 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
             }
         }
 
-        virtual void Visit(const OperandOperator& op) override
+        virtual void Visit(const std::shared_ptr<const OperandOperator>& op) override
         {
             assert(definition);
             AddOperation(StackMachineOpcode::LoadArg,
-                         GetArgumentAddress(definition.value().GetNumOperands(), op.GetIndex()));
+                         GetArgumentAddress(definition.value().GetNumOperands(), op->GetIndex()));
         };
 
-        virtual void Visit(const DefineOperator& op) override
+        virtual void Visit(const std::shared_ptr<const DefineOperator>& op) override
         {
             AddOperation(StackMachineOpcode::LoadConst, 0);
         };
 
-        virtual void Visit(const LoadVariableOperator& op) override
+        virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
         {
             AddOperation(StackMachineOpcode::LoadVariable,
-                         GetOrCreateVariableIndex(op.GetVariableName()));
+                         GetOrCreateVariableIndex(op->GetVariableName()));
         };
 
-        virtual void Visit(const LoadArrayOperator& op) override
+        virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
         {
-            op.GetIndex()->Accept(*this);
+            op->GetIndex()->Accept(*this);
             AddOperation(StackMachineOpcode::LoadArrayElement);
         };
 
-        virtual void Visit(const PrintCharOperator& op) override
+        virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
         {
-            op.GetCharacter()->Accept(*this);
+            op->GetCharacter()->Accept(*this);
             AddOperation(StackMachineOpcode::PrintChar);
         };
 
-        virtual void Visit(const ParenthesisOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) override
         {
-            auto& operators = op.GetOperators();
+            auto& operators = op->GetOperators();
 
             for (size_t i = 0; i < operators.size(); i++)
             {
@@ -315,30 +315,30 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
             }
         }
 
-        virtual void Visit(const DecimalOperator& op) override
+        virtual void Visit(const std::shared_ptr<const DecimalOperator>& op) override
         {
-            op.GetOperand()->Accept(*this);
+            op->GetOperand()->Accept(*this);
             AddOperation(StackMachineOpcode::LoadConst, 10);
             AddOperation(StackMachineOpcode::Mult);
-            AddOperation(StackMachineOpcode::LoadConst, op.GetValue());
+            AddOperation(StackMachineOpcode::LoadConst, op->GetValue());
             AddOperation(StackMachineOpcode::Add);
         }
 
-        virtual void Visit(const StoreVariableOperator& op) override
+        virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
         {
-            op.GetOperand()->Accept(*this);
+            op->GetOperand()->Accept(*this);
             AddOperation(StackMachineOpcode::StoreVariable,
-                         GetOrCreateVariableIndex(op.GetVariableName()));
+                         GetOrCreateVariableIndex(op->GetVariableName()));
         }
 
-        virtual void Visit(const StoreArrayOperator& op) override
+        virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
         {
-            op.GetValue()->Accept(*this);
-            op.GetIndex()->Accept(*this);
+            op->GetValue()->Accept(*this);
+            op->GetIndex()->Accept(*this);
             AddOperation(StackMachineOpcode::StoreArrayElement);
         }
 
-        virtual void Visit(const BinaryOperator& op) override
+        virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
         {
             auto EmitComparisonBranch = [this](StackMachineOpcode opcode, bool reverse) {
                 int ifFalse = nextLabel++, end = nextLabel++;
@@ -356,10 +356,10 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
                 AddStackSize(-1);
             };
 
-            op.GetLeft()->Accept(*this);
-            op.GetRight()->Accept(*this);
+            op->GetLeft()->Accept(*this);
+            op->GetRight()->Accept(*this);
 
-            switch (op.GetType())
+            switch (op->GetType())
             {
             case BinaryType::Add:
                 AddOperation(StackMachineOpcode::Add);
@@ -400,15 +400,16 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
             }
         }
 
-        virtual void Visit(const ConditionalOperator& op) override
+        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
         {
             int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
 
             // Helper function to emit code for branch
             // - Call this after generating evaluation code of condition operator
-            auto Emit = [this, ifTrueLabel, endLabel](StackMachineOpcode opcode,
-                                                      const std::shared_ptr<Operator>& ifTrue,
-                                                      const std::shared_ptr<Operator>& ifFalse) {
+            auto Emit = [this, ifTrueLabel,
+                         endLabel](StackMachineOpcode opcode,
+                                   const std::shared_ptr<const Operator>& ifTrue,
+                                   const std::shared_ptr<const Operator>& ifFalse) {
                 AddOperation(opcode, ifTrueLabel);
 
                 int savedStackSize = stackSize;
@@ -430,7 +431,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
                 AddOperation(StackMachineOpcode::Lavel, endLabel);
             };
 
-            if (auto* binary = dynamic_cast<const BinaryOperator*>(op.GetCondition().get()))
+            if (auto* binary = dynamic_cast<const BinaryOperator*>(op->GetCondition().get()))
             {
                 // Special optimiztion for comparisons
                 switch (binary->GetType())
@@ -438,56 +439,56 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
                 case BinaryType::Equal:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfEqual, op.GetIfTrue(), op.GetIfFalse());
+                    Emit(StackMachineOpcode::GotoIfEqual, op->GetIfTrue(), op->GetIfFalse());
                     return;
                 case BinaryType::NotEqual:
                     // "a != b ? c ? d" is equivalent to "a == b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfEqual, op.GetIfFalse(), op.GetIfTrue());
+                    Emit(StackMachineOpcode::GotoIfEqual, op->GetIfFalse(), op->GetIfTrue());
                     return;
                 case BinaryType::LessThan:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThan, op.GetIfTrue(), op.GetIfFalse());
+                    Emit(StackMachineOpcode::GotoIfLessThan, op->GetIfTrue(), op->GetIfFalse());
                     return;
                 case BinaryType::LessThanOrEqual:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op.GetIfTrue(),
-                         op.GetIfFalse());
+                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op->GetIfTrue(),
+                         op->GetIfFalse());
                     return;
                 case BinaryType::GreaterThanOrEqual:
                     // "a >= b ? c ? d" is equivalent to "a < b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThan, op.GetIfFalse(), op.GetIfTrue());
+                    Emit(StackMachineOpcode::GotoIfLessThan, op->GetIfFalse(), op->GetIfTrue());
                     return;
                 case BinaryType::GreaterThan:
                     // "a > b ? c ? d" is equivalent to "a <= b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op.GetIfFalse(),
-                         op.GetIfTrue());
+                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op->GetIfFalse(),
+                         op->GetIfTrue());
                     return;
                 default:
                     break;
                 }
             }
 
-            op.GetCondition()->Accept(*this);
-            Emit(StackMachineOpcode::GotoIfTrue, op.GetIfTrue(), op.GetIfFalse());
+            op->GetCondition()->Accept(*this);
+            Emit(StackMachineOpcode::GotoIfTrue, op->GetIfTrue(), op->GetIfFalse());
         };
 
-        virtual void Visit(const UserDefinedOperator& op) override
+        virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
         {
-            auto operands = op.GetOperands();
+            auto operands = op->GetOperands();
             for (size_t i = 0; i < operands.size(); i++)
             {
                 operands[i]->Accept(*this);
             }
 
-            AddOperation(StackMachineOpcode::Call, operatorLabels[op.GetDefinition()]);
+            AddOperation(StackMachineOpcode::Call, operatorLabels[op->GetDefinition()]);
         }
 
         void AddStackSize(int value)

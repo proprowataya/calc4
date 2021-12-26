@@ -87,9 +87,10 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
 inline const char* GetIntegerSizeDescription(int size);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
-void PrintTree(const Operator& op, int depth);
-bool HasRecursiveCall(const Operator& op, const CompilationContext& context);
-bool HasRecursiveCallInternal(const Operator& op, const CompilationContext& context,
+void PrintTree(const std::shared_ptr<const Operator>& op, int depth);
+bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context);
+bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
+                              const CompilationContext& context,
                               std::unordered_map<const OperatorDefinition*, int> called);
 const char* GetExecutionTypeString(ExecutionType type);
 
@@ -367,7 +368,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
             op = Optimize<TNumber>(context, op);
         }
 
-        bool hasRecursiveCall = HasRecursiveCall(*op, context);
+        bool hasRecursiveCall = HasRecursiveCall(op, context);
 
         if (option.printInfo)
         {
@@ -377,7 +378,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
                  << "---------------------------" << endl
                  << "Module {" << endl
                  << "Main:" << endl;
-            PrintTree(*op, 1);
+            PrintTree(op, 1);
             cout << endl;
 
             for (auto it = context.UserDefinedOperatorBegin();
@@ -387,7 +388,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
                 auto& op = it->second.GetOperator();
 
                 cout << name << ":" << endl;
-                PrintTree(*op, 1);
+                PrintTree(op, 1);
             }
 
             cout << "}" << endl << "---------------------------" << endl << endl;
@@ -396,7 +397,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
         ExecutionType actualExecutionEngine = option.executionType;
 #ifdef ENABLE_JIT
         if (actualExecutionEngine == ExecutionType::JIT && !option.alwaysJit &&
-            !HasRecursiveCall(*op, context))
+            !HasRecursiveCall(op, context))
         {
             // There is no need to use Jit compilation for simple program.
             // So we use StackMachine execution instead.
@@ -541,7 +542,7 @@ void PrintHelp(int argc, char** argv)
          << Indent << "Perform test" << endl;
 }
 
-void PrintTree(const Operator& op, int depth)
+void PrintTree(const std::shared_ptr<const Operator>& op, int depth)
 {
     using namespace std;
 
@@ -554,32 +555,33 @@ void PrintTree(const Operator& op, int depth)
 
     PrintIndent();
 
-    cout << op.ToString() << endl;
-    for (auto& operand : op.GetOperands())
+    cout << op->ToString() << endl;
+    for (auto& operand : op->GetOperands())
     {
-        PrintTree(*operand, depth + 1);
+        PrintTree(operand, depth + 1);
     }
 
-    if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(&op))
+    if (auto parenthesis = std::dynamic_pointer_cast<const ParenthesisOperator>(op))
     {
         PrintIndent();
         cout << "Contains:" << endl;
         for (auto& op2 : parenthesis->GetOperators())
         {
-            PrintTree(*op2, depth + 1);
+            PrintTree(op2, depth + 1);
         }
     }
 }
 
-bool HasRecursiveCall(const Operator& op, const CompilationContext& context)
+bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context)
 {
     return HasRecursiveCallInternal(op, context, {});
 }
 
-bool HasRecursiveCallInternal(const Operator& op, const CompilationContext& context,
+bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
+                              const CompilationContext& context,
                               std::unordered_map<const OperatorDefinition*, int> called)
 {
-    if (auto userDefined = dynamic_cast<const UserDefinedOperator*>(&op))
+    if (auto userDefined = std::dynamic_pointer_cast<const UserDefinedOperator>(op))
     {
         auto& definition = userDefined->GetDefinition();
         if (++called[&definition] > 1)
@@ -589,7 +591,7 @@ bool HasRecursiveCallInternal(const Operator& op, const CompilationContext& cont
         }
 
         if (HasRecursiveCallInternal(
-                *context.GetOperatorImplement(definition.GetName()).GetOperator(), context, called))
+                context.GetOperatorImplement(definition.GetName()).GetOperator(), context, called))
         {
             --called[&definition];
             return true;
@@ -599,20 +601,20 @@ bool HasRecursiveCallInternal(const Operator& op, const CompilationContext& cont
             --called[&definition];
         }
     }
-    else if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(&op))
+    else if (auto parenthesis = std::dynamic_pointer_cast<const ParenthesisOperator>(op))
     {
         for (auto& op2 : parenthesis->GetOperators())
         {
-            if (HasRecursiveCallInternal(*op2, context, called))
+            if (HasRecursiveCallInternal(op2, context, called))
             {
                 return true;
             }
         }
     }
 
-    for (auto& operand : op.GetOperands())
+    for (auto& operand : op->GetOperands())
     {
-        if (HasRecursiveCallInternal(*operand, context, called))
+        if (HasRecursiveCallInternal(operand, context, called))
         {
             return true;
         }

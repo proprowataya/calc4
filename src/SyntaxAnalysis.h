@@ -13,8 +13,8 @@
 
 class Token;
 std::vector<std::shared_ptr<Token>> Lex(const std::string& text, CompilationContext& context);
-std::shared_ptr<Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
-                                CompilationContext& context);
+std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
+                                      CompilationContext& context);
 
 /* ********** */
 
@@ -23,8 +23,8 @@ class Token
 public:
     virtual int GetNumOperands() const = 0;
     virtual const std::string& GetSupplementaryText() const = 0;
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const = 0;
     virtual ~Token() {}
 };
@@ -64,8 +64,8 @@ public:
         return index;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<OperandOperator>(index);
@@ -106,8 +106,8 @@ public:
         return tokens;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<DefineOperator>();
@@ -132,8 +132,8 @@ public:
         return supplementaryText;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<LoadVariableOperator>(supplementaryText);
@@ -161,8 +161,8 @@ public:
         return tokens;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return Parse(tokens, context);
@@ -189,8 +189,8 @@ public:
         return value;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<DecimalOperator>(operands[0], value);
@@ -215,8 +215,8 @@ public:
         return supplementaryText;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<StoreVariableOperator>(operands[0], supplementaryText);
@@ -234,8 +234,8 @@ private:
 public:
     LoadArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<LoadArrayOperator>(operands[0]);
@@ -253,8 +253,8 @@ private:
 public:
     PrintCharToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<PrintCharOperator>(operands[0]);
@@ -281,8 +281,8 @@ public:
         return type;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<BinaryOperator>(operands[0], operands[1], type);
@@ -300,8 +300,8 @@ private:
 public:
     StoreArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<StoreArrayOperator>(operands[0], operands[1]);
@@ -322,8 +322,8 @@ public:
     {
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<ConditionalOperator>(operands[0], operands[1], operands[2]);
@@ -351,8 +351,8 @@ public:
         return definition;
     }
 
-    virtual std::shared_ptr<Operator> CreateOperator(
-        const std::vector<std::shared_ptr<Operator>>& operands,
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
         return std::make_shared<UserDefinedOperator>(definition, operands);
