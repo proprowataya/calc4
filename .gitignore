@@ -263,4 +263,4 @@ __pycache__/
 *.out
 *.o
 *.d
-calc4
+calc4*
