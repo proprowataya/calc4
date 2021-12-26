@@ -2,6 +2,7 @@
 #include "Jit.h"
 #include "Operators.h"
 #include "Optimizer.h"
+#include "StackMachine.h"
 #include "SyntaxAnalysis.h"
 #include "Test.h"
 #include <chrono>
@@ -21,6 +22,7 @@ constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max
 enum class ExecutionType
 {
     JIT,
+    StackMachine,
     Interpreter,
 };
 
@@ -155,7 +157,7 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             }
             else if (str == CommandLineArgs::DisableJit)
             {
-                option.executionType = ExecutionType::Interpreter;
+                option.executionType = ExecutionType::StackMachine;
             }
             else if (str == CommandLineArgs::AlwaysJit || str == CommandLineArgs::AlwaysJitShort)
             {
@@ -348,19 +350,52 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
             cout << "}" << endl << "---------------------------" << endl << endl;
         }
 
-        TNumber result;
+        ExecutionType actualExecutionEngine = option.executionType;
+        if (actualExecutionEngine == ExecutionType::JIT && !option.alwaysJit &&
+            !HasRecursiveCall(*op, context))
+        {
+            // There is no need to use Jit compilation for simple program.
+            // So we use StackMachine execution instead.
+            actualExecutionEngine = ExecutionType::StackMachine;
+        }
         if constexpr (std::is_same_v<TNumber, mpz_class>)
         {
-            // Jit compiler does not support GMP
-            result = Evaluate<TNumber>(context, state, op);
+            if (actualExecutionEngine == ExecutionType::JIT)
+            {
+                // Jit compiler does not support GMP
+                actualExecutionEngine = ExecutionType::StackMachine;
+            }
         }
-        else
+
+        TNumber result;
+        switch (actualExecutionEngine)
         {
-            result = (option.executionType == ExecutionType::JIT &&
-                      (option.alwaysJit || HasRecursiveCall(*op, context)))
-                ? EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo)
-                : Evaluate<TNumber>(context, state, op);
+        case ExecutionType::JIT:
+            if constexpr (std::is_same_v<TNumber, mpz_class>)
+            {
+                result = 0; // Suppress compiler warning
+                UNREACHABLE();
+            }
+            else
+            {
+                result =
+                    EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo);
+            }
+            break;
+        case ExecutionType::StackMachine:
+        {
+            auto module = GenerateStackMachineModule<TNumber>(op, context);
+            result = ExecuteStackMachineModule(module, state);
+            break;
         }
+        case ExecutionType::Interpreter:
+            result = Evaluate<TNumber>(context, state, op);
+        default:
+            result = 0; // Suppress compiler warning
+            UNREACHABLE();
+            break;
+        }
+
         auto end = chrono::high_resolution_clock::now();
 
         cout << result << endl

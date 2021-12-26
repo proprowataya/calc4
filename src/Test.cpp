@@ -3,6 +3,7 @@
 #include "Jit.h"
 #include "Operators.h"
 #include "Optimizer.h"
+#include "StackMachine.h"
 #include "SyntaxAnalysis.h"
 #include <cstdint>
 #include <gmpxx.h>
@@ -10,6 +11,13 @@
 
 namespace
 {
+enum class ExecutorType
+{
+    JIT,
+    StackMachine,
+    Interpreter,
+};
+
 struct TestCase
 {
     const char* input;
@@ -108,21 +116,38 @@ void TestAll()
 
 namespace
 {
+constexpr const char* GetExecutorTypeDescription(ExecutorType type)
+{
+    switch (type)
+    {
+    case ExecutorType::JIT:
+        return "JIT";
+    case ExecutorType::StackMachine:
+        return "StackMachine";
+    case ExecutorType::Interpreter:
+        return "Interpreter";
+    default:
+        return "<unknown>";
+    }
+}
+
 template<typename TNumber>
 void TestOne(TestCase test, TestResult& testResult)
 {
     using namespace std;
 
-    for (auto& optimize : { true, false })
+    for (auto optimize : { true, false })
     {
-        for (auto& jit : { true, false })
+        for (auto executor :
+             { ExecutorType::Interpreter, ExecutorType::StackMachine, ExecutorType::JIT })
         {
             try
             {
                 cout << "Testing for \"" << test.input
                      << "\" (optimize = " << (optimize ? "on" : "off")
-                     << ", JIT = " << (jit ? "on" : "off") << ", type = " << typeid(TNumber).name()
-                     << ") ";
+                     << ", Executor = " << GetExecutorTypeDescription(executor)
+                     << ", type = " << typeid(TNumber).name() << ") ";
+
                 CompilationContext context;
                 auto tokens = Lex(test.input, context);
                 auto op = Parse(tokens, context);
@@ -140,26 +165,37 @@ void TestOne(TestCase test, TestResult& testResult)
 
                 if constexpr (std::is_same_v<TNumber, mpz_class>)
                 {
-                    if (jit)
+                    if (executor == ExecutorType::JIT)
                     {
                         // Jit compiler does not support GMP, so we skip execution
                         continue;
                     }
-                    else
-                    {
-                        result = Evaluate(context, state, op);
-                    }
                 }
-                else
+
+                switch (executor)
                 {
-                    if (jit)
+                case ExecutorType::JIT:
+                    if constexpr (std::is_same_v<TNumber, mpz_class>)
+                    {
+                        UNREACHABLE();
+                    }
+                    else
                     {
                         result = EvaluateByJIT<TNumber>(context, state, op, optimize, false);
                     }
-                    else
-                    {
-                        result = Evaluate(context, state, op);
-                    }
+                    break;
+                case ExecutorType::StackMachine:
+                {
+                    auto module = GenerateStackMachineModule<TNumber>(op, context);
+                    result = ExecuteStackMachineModule(module, state);
+                    break;
+                }
+                case ExecutorType::Interpreter:
+                    result = Evaluate(context, state, op);
+                    break;
+                default:
+                    UNREACHABLE();
+                    break;
                 }
 
                 if (result != test.expected)

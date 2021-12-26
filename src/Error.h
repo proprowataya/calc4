@@ -44,6 +44,11 @@ static inline std::string CodeIsEmpty()
     return "Code is empty";
 }
 
+static inline std::string StackOverflow()
+{
+    return "Stack overflow";
+}
+
 static inline std::string AssertionError(const std::string& message = "")
 {
     std::string text = "Assertion error (this is a bug of compiler)";

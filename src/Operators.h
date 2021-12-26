@@ -72,6 +72,11 @@ public:
     int GetNumOperands() const
     {
         return numOperands;
+    };
+
+    bool operator==(const OperatorDefinition& other) const
+    {
+        return name == other.GetName() && numOperands == other.GetNumOperands();
     }
 };
 

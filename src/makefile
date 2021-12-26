@@ -1,5 +1,5 @@
 PROGRAM = calc4
-OBJS = Common.o Jit.o Main.o Optimizer.o SyntaxAnalysis.o Test.o
+OBJS = Common.o Jit.o Main.o Optimizer.o StackMachine.o SyntaxAnalysis.o Test.o
 
 CC = clang${LLVM_VERSION_SUFFIX}
 CXX = clang++${LLVM_VERSION_SUFFIX}
