@@ -40,7 +40,7 @@ public:
 
     virtual void Visit(const std::shared_ptr<const ZeroOperator>& op) override
     {
-        value = std::make_shared<PrecomputedOperator>(static_cast<TNumber>(0));
+        value = PrecomputedOperator::Create(static_cast<TNumber>(0));
     };
 
     virtual void Visit(const std::shared_ptr<const PrecomputedOperator>& op) override
@@ -55,7 +55,7 @@ public:
 
     virtual void Visit(const std::shared_ptr<const DefineOperator>& op) override
     {
-        value = std::make_shared<PrecomputedOperator>(static_cast<TNumber>(0));
+        value = PrecomputedOperator::Create(static_cast<TNumber>(0));
     };
 
     virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
@@ -66,13 +66,13 @@ public:
     virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
     {
         std::shared_ptr<const Operator> index = Precompute(op->GetIndex());
-        value = std::make_shared<LoadArrayOperator>(index);
+        value = LoadArrayOperator::Create(index);
     };
 
     virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
     {
         std::shared_ptr<const Operator> character = Precompute(op->GetCharacter());
-        value = std::make_shared<PrintCharOperator>(character);
+        value = PrintCharOperator::Create(character);
     };
 
     virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) override
@@ -97,7 +97,7 @@ public:
         }
         else
         {
-            value = std::make_shared<ParenthesisOperator>(std::move(optimized));
+            value = ParenthesisOperator::Create(std::move(optimized));
         }
     };
 
@@ -107,26 +107,26 @@ public:
         TNumber precomputedValue;
         if (TryGetPrecomputedValue(precomputed, &precomputedValue))
         {
-            value = std::make_shared<PrecomputedOperator>(
+            value = PrecomputedOperator::Create(
                 static_cast<TNumber>(precomputedValue * 10 + op->GetValue()));
         }
         else
         {
-            value = std::make_shared<DecimalOperator>(precomputed, op->GetValue());
+            value = DecimalOperator::Create(precomputed, op->GetValue());
         }
     };
 
     virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
     {
         std::shared_ptr<const Operator> operand = Precompute(op->GetOperand());
-        value = std::make_shared<StoreVariableOperator>(operand, op->GetVariableName());
+        value = StoreVariableOperator::Create(operand, op->GetVariableName());
     }
 
     virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
     {
         std::shared_ptr<const Operator> valueToBeStored = Precompute(op->GetValue());
         std::shared_ptr<const Operator> index = Precompute(op->GetIndex());
-        value = std::make_shared<StoreArrayOperator>(valueToBeStored, index);
+        value = StoreArrayOperator::Create(valueToBeStored, index);
     }
 
     virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
@@ -179,11 +179,11 @@ public:
                 break;
             }
 
-            value = std::make_shared<PrecomputedOperator>(result);
+            value = PrecomputedOperator::Create(result);
         }
         else
         {
-            value = std::make_shared<BinaryOperator>(left, right, op->GetType());
+            value = BinaryOperator::Create(left, right, op->GetType());
         }
     };
 
@@ -200,7 +200,7 @@ public:
         }
         else
         {
-            value = std::make_shared<ConditionalOperator>(condition, ifTrue, ifFalse);
+            value = ConditionalOperator::Create(condition, ifTrue, ifFalse);
         }
     };
 
@@ -213,7 +213,7 @@ public:
             operands.push_back(Precompute(op2));
         }
 
-        value = std::make_shared<UserDefinedOperator>(op->GetDefinition(), std::move(operands));
+        value = UserDefinedOperator::Create(op->GetDefinition(), std::move(operands));
     };
 };
 }

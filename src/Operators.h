@@ -160,6 +160,29 @@ public:
     virtual ~Operator() = default;
 };
 
+#define MAKE_ALLOCATE_HELPER(TYPE_NAME)                                                            \
+    template<typename TBase>                                                                       \
+    class AllocateHelper                                                                           \
+    {                                                                                              \
+        friend TYPE_NAME;                                                                          \
+                                                                                                   \
+        struct Object : public TBase                                                               \
+        {                                                                                          \
+            template<typename... Args>                                                             \
+            Object(Args&&... args) : TBase(std::forward<Args>(args)...)                            \
+            {                                                                                      \
+            }                                                                                      \
+        };                                                                                         \
+                                                                                                   \
+        template<typename... Args>                                                                 \
+        static std::shared_ptr<Object> Allocate(Args&&... args)                                    \
+        {                                                                                          \
+            return std::make_shared<Object>(std::forward<Args>(args)...);                          \
+        }                                                                                          \
+    };                                                                                             \
+                                                                                                   \
+    friend class AllocateHelper<TYPE_NAME>
+
 #define MAKE_ACCEPT                                                                                \
     virtual void Accept(OperatorVisitor& visitor) const override                                   \
     {                                                                                              \
@@ -174,7 +197,17 @@ public:
 
 class ZeroOperator : public Operator, public std::enable_shared_from_this<ZeroOperator>
 {
+private:
+    ZeroOperator() {}
+
+    MAKE_ALLOCATE_HELPER(ZeroOperator);
+
 public:
+    static std::shared_ptr<const ZeroOperator> Create()
+    {
+        return AllocateHelper<ZeroOperator>::Allocate();
+    }
+
     virtual std::string ToString() const override
     {
         return "ZeroOperator []";
@@ -190,10 +223,18 @@ class PrecomputedOperator : public Operator,
 private:
     AnyNumber value;
 
-public:
     template<typename TNumber>
     PrecomputedOperator(const TNumber& value) : value(value)
     {
+    }
+
+    MAKE_ALLOCATE_HELPER(PrecomputedOperator);
+
+public:
+    template<typename TNumber>
+    static std::shared_ptr<const PrecomputedOperator> Create(const TNumber& value)
+    {
+        return AllocateHelper<PrecomputedOperator>::Allocate(value);
     }
 
     template<typename TNumber>
@@ -218,8 +259,15 @@ class OperandOperator : public Operator, public std::enable_shared_from_this<Ope
 private:
     int index;
 
-public:
     OperandOperator(int index) : index(index) {}
+
+    MAKE_ALLOCATE_HELPER(OperandOperator);
+
+public:
+    static std::shared_ptr<const OperandOperator> Create(int index)
+    {
+        return AllocateHelper<OperandOperator>::Allocate(index);
+    }
 
     int GetIndex() const
     {
@@ -239,7 +287,17 @@ public:
 
 class DefineOperator : public Operator, public std::enable_shared_from_this<DefineOperator>
 {
+private:
+    DefineOperator() {}
+
+    MAKE_ALLOCATE_HELPER(DefineOperator);
+
 public:
+    static std::shared_ptr<const DefineOperator> Create()
+    {
+        return AllocateHelper<DefineOperator>::Allocate();
+    }
+
     virtual std::string ToString() const override
     {
         return "DefineOperator []";
@@ -255,10 +313,15 @@ class LoadVariableOperator : public Operator,
 private:
     std::string variableName;
 
-public:
-    LoadVariableOperator(std::string&& variableName) : variableName(variableName) {}
-
     LoadVariableOperator(const std::string& variableName) : variableName(variableName) {}
+
+    MAKE_ALLOCATE_HELPER(LoadVariableOperator);
+
+public:
+    static std::shared_ptr<const LoadVariableOperator> Create(const std::string& variableName)
+    {
+        return AllocateHelper<LoadVariableOperator>::Allocate(variableName);
+    }
 
     const std::string& GetVariableName() const
     {
@@ -279,8 +342,16 @@ class LoadArrayOperator : public Operator, public std::enable_shared_from_this<L
 private:
     std::shared_ptr<const Operator> index;
 
-public:
     LoadArrayOperator(const std::shared_ptr<const Operator>& index) : index(index) {}
+
+    MAKE_ALLOCATE_HELPER(LoadArrayOperator);
+
+public:
+    static std::shared_ptr<const LoadArrayOperator> Create(
+        const std::shared_ptr<const Operator>& index)
+    {
+        return AllocateHelper<LoadArrayOperator>::Allocate(index);
+    }
 
     const std::shared_ptr<const Operator>& GetIndex() const
     {
@@ -301,8 +372,16 @@ class PrintCharOperator : public Operator, public std::enable_shared_from_this<P
 private:
     std::shared_ptr<const Operator> character;
 
-public:
     PrintCharOperator(const std::shared_ptr<const Operator>& character) : character(character) {}
+
+    MAKE_ALLOCATE_HELPER(PrintCharOperator);
+
+public:
+    static std::shared_ptr<const PrintCharOperator> Create(
+        const std::shared_ptr<const Operator>& character)
+    {
+        return AllocateHelper<PrintCharOperator>::Allocate(character);
+    }
 
     const std::shared_ptr<const Operator>& GetCharacter() const
     {
@@ -324,15 +403,18 @@ class ParenthesisOperator : public Operator,
 private:
     std::vector<std::shared_ptr<const Operator>> operators;
 
-public:
     ParenthesisOperator(const std::vector<std::shared_ptr<const Operator>>& operators)
         : operators(operators)
     {
     }
 
-    ParenthesisOperator(std::vector<std::shared_ptr<const Operator>>&& operators)
-        : operators(operators)
+    MAKE_ALLOCATE_HELPER(ParenthesisOperator);
+
+public:
+    static std::shared_ptr<const ParenthesisOperator> Create(
+        const std::vector<std::shared_ptr<const Operator>>& operators)
     {
+        return AllocateHelper<ParenthesisOperator>::Allocate(operators);
     }
 
     const std::vector<std::shared_ptr<const Operator>>& GetOperators() const
@@ -357,10 +439,18 @@ private:
     std::shared_ptr<const Operator> operand;
     int value;
 
-public:
     DecimalOperator(const std::shared_ptr<const Operator>& operand, int value)
         : operand(operand), value(value)
     {
+    }
+
+    MAKE_ALLOCATE_HELPER(DecimalOperator);
+
+public:
+    static std::shared_ptr<const DecimalOperator> Create(
+        const std::shared_ptr<const Operator>& operand, int value)
+    {
+        return AllocateHelper<DecimalOperator>::Allocate(operand, value);
     }
 
     const std::shared_ptr<const Operator>& GetOperand() const
@@ -391,17 +481,19 @@ private:
     std::shared_ptr<const Operator> operand;
     std::string variableName;
 
-public:
     StoreVariableOperator(const std::shared_ptr<const Operator>& operand,
                           const std::string& variableName)
         : operand(operand), variableName(variableName)
     {
     }
 
-    StoreVariableOperator(const std::shared_ptr<const Operator>& operand,
-                          std::string&& variableName)
-        : operand(operand), variableName(variableName)
+    MAKE_ALLOCATE_HELPER(StoreVariableOperator);
+
+public:
+    static std::shared_ptr<const StoreVariableOperator> Create(
+        const std::shared_ptr<const Operator>& operand, const std::string& variableName)
     {
+        return AllocateHelper<StoreVariableOperator>::Allocate(operand, variableName);
     }
 
     const std::shared_ptr<const Operator>& GetOperand() const
@@ -428,11 +520,19 @@ class StoreArrayOperator : public Operator, public std::enable_shared_from_this<
 private:
     std::shared_ptr<const Operator> value, index;
 
-public:
     StoreArrayOperator(const std::shared_ptr<const Operator>& value,
                        const std::shared_ptr<const Operator>& index)
         : value(value), index(index)
     {
+    }
+
+    MAKE_ALLOCATE_HELPER(StoreArrayOperator);
+
+public:
+    static std::shared_ptr<const StoreArrayOperator> Create(
+        const std::shared_ptr<const Operator>& value, const std::shared_ptr<const Operator>& index)
+    {
+        return AllocateHelper<StoreArrayOperator>::Allocate(value, index);
     }
 
     const std::shared_ptr<const Operator>& GetValue() const
@@ -475,11 +575,20 @@ private:
     std::shared_ptr<const Operator> left, right;
     BinaryType type;
 
-public:
     BinaryOperator(const std::shared_ptr<const Operator>& left,
                    const std::shared_ptr<const Operator>& right, BinaryType type)
         : left(left), right(right), type(type)
     {
+    }
+
+    MAKE_ALLOCATE_HELPER(BinaryOperator);
+
+public:
+    static std::shared_ptr<const BinaryOperator> Create(
+        const std::shared_ptr<const Operator>& left, const std::shared_ptr<const Operator>& right,
+        BinaryType type)
+    {
+        return AllocateHelper<BinaryOperator>::Allocate(left, right, type);
     }
 
     BinaryType GetType() const
@@ -525,12 +634,22 @@ class ConditionalOperator : public Operator,
 private:
     std::shared_ptr<const Operator> condition, ifTrue, ifFalse;
 
-public:
     ConditionalOperator(const std::shared_ptr<const Operator>& condition,
                         const std::shared_ptr<const Operator>& ifTrue,
                         const std::shared_ptr<const Operator>& ifFalse)
         : condition(condition), ifTrue(ifTrue), ifFalse(ifFalse)
     {
+    }
+
+    MAKE_ALLOCATE_HELPER(ConditionalOperator);
+
+public:
+    static std::shared_ptr<const ConditionalOperator> Create(
+        const std::shared_ptr<const Operator>& condition,
+        const std::shared_ptr<const Operator>& ifTrue,
+        const std::shared_ptr<const Operator>& ifFalse)
+    {
+        return AllocateHelper<ConditionalOperator>::Allocate(condition, ifTrue, ifFalse);
     }
 
     const std::shared_ptr<const Operator>& GetCondition() const
@@ -564,17 +683,20 @@ private:
     OperatorDefinition definition;
     std::vector<std::shared_ptr<const Operator>> operands;
 
-public:
     UserDefinedOperator(const OperatorDefinition& definition,
                         const std::vector<std::shared_ptr<const Operator>>& operands)
         : definition(definition), operands(operands)
     {
     }
 
-    UserDefinedOperator(const OperatorDefinition& definition,
-                        std::vector<std::shared_ptr<const Operator>>&& operands)
-        : definition(definition), operands(operands)
+    MAKE_ALLOCATE_HELPER(UserDefinedOperator);
+
+public:
+    static std::shared_ptr<const UserDefinedOperator> Create(
+        const OperatorDefinition& definition,
+        const std::vector<std::shared_ptr<const Operator>>& operands)
     {
+        return AllocateHelper<UserDefinedOperator>::Allocate(definition, operands);
     }
 
     const OperatorDefinition& GetDefinition() const

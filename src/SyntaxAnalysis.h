@@ -68,7 +68,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<OperandOperator>(index);
+        return OperandOperator::Create(index);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -110,7 +110,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<DefineOperator>();
+        return DefineOperator::Create();
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -136,7 +136,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<LoadVariableOperator>(supplementaryText);
+        return LoadVariableOperator::Create(supplementaryText);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -193,7 +193,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<DecimalOperator>(operands[0], value);
+        return DecimalOperator::Create(operands[0], value);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -219,7 +219,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<StoreVariableOperator>(operands[0], supplementaryText);
+        return StoreVariableOperator::Create(operands[0], supplementaryText);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -238,7 +238,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<LoadArrayOperator>(operands[0]);
+        return LoadArrayOperator::Create(operands[0]);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -257,7 +257,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<PrintCharOperator>(operands[0]);
+        return PrintCharOperator::Create(operands[0]);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -285,7 +285,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<BinaryOperator>(operands[0], operands[1], type);
+        return BinaryOperator::Create(operands[0], operands[1], type);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -304,7 +304,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<StoreArrayOperator>(operands[0], operands[1]);
+        return StoreArrayOperator::Create(operands[0], operands[1]);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -326,7 +326,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<ConditionalOperator>(operands[0], operands[1], operands[2]);
+        return ConditionalOperator::Create(operands[0], operands[1], operands[2]);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;
@@ -355,7 +355,7 @@ public:
         const std::vector<std::shared_ptr<const Operator>>& operands,
         CompilationContext& context) const override
     {
-        return std::make_shared<UserDefinedOperator>(definition, operands);
+        return UserDefinedOperator::Create(definition, operands);
     }
 
     MAKE_GET_SUPPLEMENTARY_TEXT;

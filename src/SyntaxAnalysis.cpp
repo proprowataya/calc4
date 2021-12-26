@@ -373,7 +373,7 @@ public:
             {
                 // If the operand missing its operand is DecimalOperator,
                 // we implicitly set ZeroOperator as its operand
-                operands.push_back(std::make_shared<ZeroOperator>());
+                operands.push_back(ZeroOperator::Create());
             }
             else
             {
@@ -457,7 +457,7 @@ std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Toke
     case 1:
         return operators[0];
     default:
-        return std::make_shared<ParenthesisOperator>(std::move(operators));
+        return ParenthesisOperator::Create(std::move(operators));
     }
 }
 
