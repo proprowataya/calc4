@@ -44,8 +44,16 @@ static inline std::string CodeIsEmpty()
     return "Code is empty";
 }
 
-static inline std::string AssertionError()
+static inline std::string AssertionError(const std::string& message = "")
 {
-    return "Assertion error (this is a bug of compiler)";
+    std::string text = "Assertion error (this is a bug of compiler)";
+
+    if (!message.empty())
+    {
+        text += ": ";
+        text += message;
+    }
+
+    return text;
 }
 }
