@@ -83,7 +83,7 @@ public:
         for (auto& op2 : op->GetOperators())
         {
             std::shared_ptr<const Operator> precomputed = Precompute(op2);
-            optimized.push_back(op2);
+            optimized.push_back(precomputed);
 
             if (dynamic_cast<const PrecomputedOperator*>(precomputed.get()) == nullptr)
             {
