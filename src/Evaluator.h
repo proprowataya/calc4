@@ -2,7 +2,10 @@
 
 #include "ExecutionState.h"
 #include "Operators.h"
+
+#ifdef ENABLE_GMP
 #include <gmpxx.h>
+#endif // ENABLE_GMP
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
@@ -64,11 +67,13 @@ TNumber Evaluate(const CompilationContext& context,
             op.GetCharacter()->Accept(*this);
 
             char c;
+#ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
                 c = static_cast<char>(value.get_si());
             }
             else
+#endif // ENABLE_GMP
             {
                 c = static_cast<char>(value);
             }
@@ -176,8 +181,11 @@ TNumber Evaluate(const CompilationContext& context,
         virtual void Visit(const UserDefinedOperator& op) override
         {
             size_t size = op.GetDefinition().GetNumOperands();
-            TNumber* arg = std::is_same<TNumber, mpz_class>::value ? new TNumber[size]
-                                                                   : STACK_ALLOC(TNumber, size);
+            TNumber* arg =
+#ifdef ENABLE_GMP
+                std::is_same<TNumber, mpz_class>::value ? new TNumber[size] :
+#endif // ENABLE_GMP
+                                                        STACK_ALLOC(TNumber, size);
 
             auto operands = op.GetOperands();
             for (size_t i = 0; i < size; i++)
@@ -192,10 +200,12 @@ TNumber Evaluate(const CompilationContext& context,
                 ->Accept(*this);
             arguments.pop();
 
+#ifdef ENABLE_GMP
             if (std::is_same<TNumber, mpz_class>::value)
             {
                 delete[] arg;
             }
+#endif // ENABLE_GMP
         }
     };
 

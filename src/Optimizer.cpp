@@ -1,7 +1,10 @@
 #include "Optimizer.h"
 #include "Operators.h"
 #include <cstdint>
+
+#ifdef ENABLE_GMP
 #include <gmpxx.h>
+#endif // ENABLE_GMP
 
 namespace
 {
@@ -240,7 +243,13 @@ template std::shared_ptr<Operator> Optimize<int32_t>(CompilationContext& context
                                                      const std::shared_ptr<Operator>& op);
 template std::shared_ptr<Operator> Optimize<int64_t>(CompilationContext& context,
                                                      const std::shared_ptr<Operator>& op);
+
+#ifdef ENABLE_INT128
 template std::shared_ptr<Operator> Optimize<__int128_t>(CompilationContext& context,
                                                         const std::shared_ptr<Operator>& op);
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
 template std::shared_ptr<Operator> Optimize<mpz_class>(CompilationContext& context,
                                                        const std::shared_ptr<Operator>& op);
+#endif // ENABLE_GMP

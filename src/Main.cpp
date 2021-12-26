@@ -1,27 +1,39 @@
 ﻿#include "Evaluator.h"
-#include "Jit.h"
 #include "Operators.h"
 #include "Optimizer.h"
 #include "StackMachine.h"
 #include "SyntaxAnalysis.h"
 #include "Test.h"
+
+#ifdef ENABLE_JIT
+#include "Jit.h"
+#endif // ENABLE_JIT
+
 #include <chrono>
 #include <cstdint>
 #include <ctime>
 #include <fstream>
-#include <gmpxx.h>
 #include <iostream>
 #include <limits>
 #include <sstream>
 #include <streambuf>
 #include <string_view>
 
+#ifdef ENABLE_GMP
+#include <gmpxx.h>
+#endif // ENABLE_GMP
+
 constexpr const char* ProgramName = "Calc4 REPL";
+
+#ifdef ENABLE_GMP
 constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
+#endif // ENABLE_GMP
 
 enum class ExecutionType
 {
+#ifdef ENABLE_JIT
     JIT,
+#endif // ENABLE_JIT
     StackMachine,
     Interpreter,
 };
@@ -29,7 +41,14 @@ enum class ExecutionType
 struct Option
 {
     int integerSize = 64;
-    ExecutionType executionType = ExecutionType::JIT;
+
+    ExecutionType executionType =
+#ifdef ENABLE_JIT
+        ExecutionType::JIT;
+#else
+        ExecutionType::StackMachine;
+#endif // ENABLE_JIT
+
     bool alwaysJit = false;
     bool optimize = true;
     bool printInfo = false;
@@ -65,6 +84,7 @@ template<typename TNumber>
 void ExecuteCore(const std::string& source, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option);
 
+inline const char* GetIntegerSizeDescription(int size);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
 void PrintTree(const Operator& op, int depth);
@@ -76,11 +96,15 @@ const char* GetExecutionTypeString(ExecutionType type);
 int main(int argc, char** argv)
 {
     using namespace std;
+
+#ifdef ENABLE_JIT
     using namespace llvm;
+#endif // ENABLE_JIT
 
     /* ***** Parse command line args ***** */
     auto [option, sources, performTest] = ParseCommandLineArgs(argc, argv);
 
+#ifdef ENABLE_JIT
     /* ***** Initialize LLVM if needed ***** */
     if (performTest || option.executionType == ExecutionType::JIT)
     {
@@ -88,12 +112,15 @@ int main(int argc, char** argv)
         LLVMInitializeNativeAsmPrinter();
         LLVMInitializeNativeAsmParser();
     }
+#endif // ENABLE_JIT
 
     /* ***** Perform test if specified ***** */
     if (performTest)
     {
         TestAll();
+#ifdef ENABLE_JIT
         llvm_shutdown();
+#endif // ENABLE_JIT
         return 0;
     }
 
@@ -105,18 +132,27 @@ int main(int argc, char** argv)
     case 64:
         Run<int64_t>(option, sources);
         break;
+
+#ifdef ENABLE_INT128
     case 128:
         Run<__int128_t>(option, sources);
         break;
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
     case InfinitePrecisionIntegerSize:
         Run<mpz_class>(option, sources);
         break;
+#endif // ENABLE_GMP
+
     default:
         UNREACHABLE();
         break;
     }
 
+#ifdef ENABLE_JIT
     llvm_shutdown();
+#endif // ENABLE_JIT
 }
 
 std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc, char** argv)
@@ -153,7 +189,11 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             }
             else if (str == CommandLineArgs::EnableJit)
             {
+#ifdef ENABLE_JIT
                 option.executionType = ExecutionType::JIT;
+#else
+                throw std::string("Jit compilation is not supported");
+#endif // ENABLE_JIT
             }
             else if (str == CommandLineArgs::DisableJit)
             {
@@ -171,7 +211,11 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
 
                 if (arg == CommandLineArgs::InfinitePrecisionInteger)
                 {
+#ifdef ENABLE_GMP
                     size = (option.integerSize = InfinitePrecisionIntegerSize);
+#else
+                    throw std::string("Infinite precision integer is not supported");
+#endif // ENABLE_GMP
                 }
                 else
                 {
@@ -254,11 +298,7 @@ void RunAsRepl(Option& option)
     cout << ProgramName << endl;
 
     /* ***** Print current setting ***** */
-    cout << "    Integer size: "
-         << (option.integerSize == InfinitePrecisionIntegerSize
-                 ? "Infinite-precision"
-                 : std::to_string(option.integerSize))
-         << endl
+    cout << "    Integer size: " << GetIntegerSizeDescription(option.integerSize) << endl
          << "    Executor: " << GetExecutionTypeString(option.executionType) << endl
          << "    Always JIT: " << (option.alwaysJit ? "on" : "off") << endl
          << "    Optimize: " << (option.optimize ? "on" : "off") << endl
@@ -311,7 +351,10 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option)
 {
     using namespace std;
+
+#ifdef ENABLE_JIT
     using namespace llvm;
+#endif // ENABLE_JIT
 
     try
     {
@@ -351,6 +394,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
         }
 
         ExecutionType actualExecutionEngine = option.executionType;
+#ifdef ENABLE_JIT
         if (actualExecutionEngine == ExecutionType::JIT && !option.alwaysJit &&
             !HasRecursiveCall(*op, context))
         {
@@ -358,6 +402,7 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
             // So we use StackMachine execution instead.
             actualExecutionEngine = ExecutionType::StackMachine;
         }
+#ifdef ENABLE_GMP
         if constexpr (std::is_same_v<TNumber, mpz_class>)
         {
             if (actualExecutionEngine == ExecutionType::JIT)
@@ -366,22 +411,28 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
                 actualExecutionEngine = ExecutionType::StackMachine;
             }
         }
+#endif // ENABLE_GMP
+#endif // ENABLE_JIT
 
         TNumber result;
         switch (actualExecutionEngine)
         {
+#ifdef ENABLE_JIT
         case ExecutionType::JIT:
+#ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
                 result = 0; // Suppress compiler warning
                 UNREACHABLE();
             }
             else
+#endif // ENABLE_GMP
             {
                 result =
                     EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo);
             }
             break;
+#endif // ENABLE_JIT
         case ExecutionType::StackMachine:
         {
             auto module = GenerateStackMachineModule<TNumber>(op, context);
@@ -409,14 +460,45 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
     }
 }
 
+inline const char* GetIntegerSizeDescription(int size)
+{
+    switch (size)
+    {
+    case 32:
+        return "32";
+    case 64:
+        return "64";
+
+#ifdef ENABLE_INT128
+    case 128:
+        return "128";
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
+    case InfinitePrecisionIntegerSize:
+        return "infinite-precision";
+#endif // ENABLE_GMP
+
+    default:
+        return "<unknown>";
+    }
+}
+
 inline bool IsSupportedIntegerSize(int size)
 {
     switch (size)
     {
     case 32:
     case 64:
+
+#ifdef ENABLE_INT128
     case 128:
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
     case InfinitePrecisionIntegerSize:
+#endif // ENABLE_GMP
+
         return true;
     default:
         return false;
@@ -434,14 +516,23 @@ void PrintHelp(int argc, char** argv)
          << CommandLineArgs::IntegerSize << "|" << CommandLineArgs::IntegerSizeShort << " <size>"
          << endl
          << Indent << "Specify size of integer" << endl
-         << Indent << "size: 32, 64, 128, " << CommandLineArgs::InfinitePrecisionInteger
-         << " (meaning infinite-precision or arbitrary-precision)" << endl
+         << Indent << "size: 32, 64"
+#ifdef ENABLE_INT128
+         << ", 128"
+#endif // ENABLE_INT128
+#ifdef ENABLE_GMP
+         << ", " << CommandLineArgs::InfinitePrecisionInteger
+         << " (meaning infinite-precision or arbitrary-precision)"
+#endif // ENABLE_GMP
+         << endl
+#ifdef ENABLE_JIT
          << CommandLineArgs::EnableJit << endl
          << Indent << "Enable JIT compilation" << endl
          << CommandLineArgs::DisableJit << endl
          << Indent << "Disable JIT compilation" << endl
          << CommandLineArgs::AlwaysJit << "|" << CommandLineArgs::AlwaysJitShort << endl
          << Indent << "Force JIT compilation" << endl
+#endif // ENABLE_JIT
          << CommandLineArgs::EnableOptimization << endl
          << Indent << "Enable optimization" << endl
          << CommandLineArgs::DisableOptimization << endl
@@ -534,8 +625,12 @@ const char* GetExecutionTypeString(ExecutionType type)
 {
     switch (type)
     {
+#ifdef ENABLE_JIT
     case ExecutionType::JIT:
         return "JIT";
+#endif // ENABLE_JIT
+    case ExecutionType::StackMachine:
+        return "StackMachine";
     case ExecutionType::Interpreter:
         return "Interpreter";
     default:

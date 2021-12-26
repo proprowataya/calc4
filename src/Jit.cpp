@@ -1,3 +1,7 @@
+#ifndef ENABLE_JIT
+#error Jit compilation is not enabled. To use Jit feature, compile this file with defining "ENABLE_JIT"
+#endif // !ENABLE_JIT
+
 #include <algorithm>
 #include <memory>
 #include <sstream>
@@ -41,10 +45,12 @@
 
 InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
-InstantiateEvaluateByJIT(__int128_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int32_t, BufferedPrinter);
 InstantiateEvaluateByJIT(int64_t, BufferedPrinter);
+#ifdef ENABLE_INT128
+InstantiateEvaluateByJIT(__int128_t, DefaultPrinter);
 InstantiateEvaluateByJIT(__int128_t, BufferedPrinter);
+#endif // ENABLE_INT128
 
 namespace
 {

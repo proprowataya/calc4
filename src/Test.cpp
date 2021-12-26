@@ -1,19 +1,28 @@
 #include "Test.h"
 #include "Evaluator.h"
-#include "Jit.h"
 #include "Operators.h"
 #include "Optimizer.h"
 #include "StackMachine.h"
 #include "SyntaxAnalysis.h"
+
+#ifdef ENABLE_JIT
+#include "Jit.h"
+#endif // ENABLE_JIT
+
 #include <cstdint>
-#include <gmpxx.h>
 #include <iostream>
+
+#ifdef ENABLE_GMP
+#include <gmpxx.h>
+#endif // ENABLE_GMP
 
 namespace
 {
 enum class ExecutorType
 {
+#ifdef ENABLE_JIT
     JIT,
+#endif // ENABLE_JIT
     StackMachine,
     Interpreter,
 };
@@ -105,8 +114,14 @@ void TestAll()
         auto test = TestCases[i];
         TestOne<int32_t>(test, result);
         TestOne<int64_t>(test, result);
+
+#ifdef ENABLE_INT128
         TestOne<__int128_t>(test, result);
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
         TestOne<mpz_class>(test, result);
+#endif // ENABLE_GMP
     }
 
     cout << "Test result" << endl
@@ -120,8 +135,10 @@ constexpr const char* GetExecutorTypeDescription(ExecutorType type)
 {
     switch (type)
     {
+#ifdef ENABLE_JIT
     case ExecutorType::JIT:
         return "JIT";
+#endif // ENABLE_JIT
     case ExecutorType::StackMachine:
         return "StackMachine";
     case ExecutorType::Interpreter:
@@ -138,8 +155,11 @@ void TestOne(TestCase test, TestResult& testResult)
 
     for (auto optimize : { true, false })
     {
-        for (auto executor :
-             { ExecutorType::Interpreter, ExecutorType::StackMachine, ExecutorType::JIT })
+        for (auto executor : { ExecutorType::Interpreter, ExecutorType::StackMachine,
+#ifdef ENABLE_JIT
+                               ExecutorType::JIT
+#endif // ENABLE_JIT
+             })
         {
             try
             {
@@ -163,6 +183,7 @@ void TestOne(TestCase test, TestResult& testResult)
                                DefaultGlobalArraySource<TNumber>, BufferedPrinter>
                     state(printer);
 
+#if defined(ENABLE_JIT) && defined(ENABLE_GMP)
                 if constexpr (std::is_same_v<TNumber, mpz_class>)
                 {
                     if (executor == ExecutorType::JIT)
@@ -171,19 +192,24 @@ void TestOne(TestCase test, TestResult& testResult)
                         continue;
                     }
                 }
+#endif // defined(ENABLE_JIT) && defined(ENABLE_GMP)
 
                 switch (executor)
                 {
+#ifdef ENABLE_JIT
                 case ExecutorType::JIT:
+#ifdef ENABLE_GMP
                     if constexpr (std::is_same_v<TNumber, mpz_class>)
                     {
                         UNREACHABLE();
                     }
                     else
+#endif // ENABLE_GMP
                     {
                         result = EvaluateByJIT<TNumber>(context, state, op, optimize, false);
                     }
                     break;
+#endif // ENABLE_JIT
                 case ExecutorType::StackMachine:
                 {
                     auto module = GenerateStackMachineModule<TNumber>(op, context);

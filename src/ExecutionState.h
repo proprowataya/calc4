@@ -1,11 +1,14 @@
 #pragma once
 
 #include "Common.h"
-#include <gmpxx.h>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#ifdef ENABLE_GMP
+#include <gmpxx.h>
+#endif // ENABLE_GMP
 
 template<typename TNumber>
 class DefaultVariableSource;
@@ -189,6 +192,7 @@ private:
 
     static IndexType ToIndexType(const TNumber& value)
     {
+#ifdef ENABLE_GMP
         if constexpr (std::is_same<TNumber, mpz_class>::value)
         {
             if (!value.fits_slong_p())
@@ -199,6 +203,7 @@ private:
             return static_cast<IndexType>(value.get_si());
         }
         else
+#endif // ENABLE_GMP
         {
             return static_cast<IndexType>(value);
         }

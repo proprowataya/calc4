@@ -19,7 +19,10 @@
 
 std::vector<std::string> Split(const std::string& str, char c);
 std::string TrimWhiteSpaces(const std::string& str);
+
+#ifdef ENABLE_INT128
 std::ostream& operator<<(std::ostream& dest, __int128_t value);
+#endif // ENABLE_INT128
 
 class AnyNumber
 {

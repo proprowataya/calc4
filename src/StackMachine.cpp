@@ -4,20 +4,33 @@
 #include "ExecutionState.h"
 #include "Operators.h"
 #include <algorithm>
-#include <gmp.h>
-#include <gmpxx.h>
 #include <optional>
 #include <unordered_map>
 #include <vector>
 
-template StackMachineModule<int32_t> GenerateStackMachineModule(const std::shared_ptr<Operator>& op,
-                                                                const CompilationContext& context);
-template StackMachineModule<int64_t> GenerateStackMachineModule(const std::shared_ptr<Operator>& op,
-                                                                const CompilationContext& context);
-template StackMachineModule<__int128_t> GenerateStackMachineModule(
-    const std::shared_ptr<Operator>& op, const CompilationContext& context);
-template StackMachineModule<mpz_class> GenerateStackMachineModule(
-    const std::shared_ptr<Operator>& op, const CompilationContext& context);
+#ifdef ENABLE_GMP
+#include <gmp.h>
+#include <gmpxx.h>
+#endif // ENABLE_GMP
+
+/*****/
+
+#define InstantiateGenerateStackMachineModule(TNumber)                                             \
+    template StackMachineModule<TNumber> GenerateStackMachineModule(                               \
+        const std::shared_ptr<Operator>& op, const CompilationContext& context)
+
+InstantiateGenerateStackMachineModule(int32_t);
+InstantiateGenerateStackMachineModule(int64_t);
+
+#ifdef ENABLE_INT128
+InstantiateGenerateStackMachineModule(__int128_t);
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
+InstantiateGenerateStackMachineModule(mpz_class);
+#endif // ENABLE_GMP
+
+/*****/
 
 #define InstantiateExecuteStackMachineModule(TNumber, TPrinter)                                    \
     template TNumber ExecuteStackMachineModule<TNumber, DefaultVariableSource<TNumber>,            \
@@ -28,13 +41,21 @@ template StackMachineModule<mpz_class> GenerateStackMachineModule(
                        TPrinter>& state)
 
 InstantiateExecuteStackMachineModule(int32_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(int64_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(__int128_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(mpz_class, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int32_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int64_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int64_t, BufferedPrinter);
+
+#ifdef ENABLE_INT128
+InstantiateExecuteStackMachineModule(__int128_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(__int128_t, BufferedPrinter);
+#endif // ENABLE_INT128
+
+#ifdef ENABLE_GMP
+InstantiateExecuteStackMachineModule(mpz_class, DefaultPrinter);
 InstantiateExecuteStackMachineModule(mpz_class, BufferedPrinter);
+#endif // ENABLE_GMP
+
+/*****/
 
 namespace std
 {
@@ -223,11 +244,13 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<Ope
             auto value = op.GetValue<TNumber>();
 
             StackMachineOperation::ValueType casted;
+#ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
                 casted = static_cast<StackMachineOperation::ValueType>(value.get_si());
             }
             else
+#endif // ENABLE_GMP
             {
                 casted = static_cast<StackMachineOperation::ValueType>(value);
             }
@@ -675,11 +698,13 @@ TNumber ExecuteStackMachineModule(
         case StackMachineOpcode::Input:
             throw "Not implemented";
         case StackMachineOpcode::PrintChar:
+#ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
                 state.PrintChar(top[-1].get_si());
             }
             else
+#endif // ENABLE_GMP
             {
                 state.PrintChar(static_cast<char>(top[-1]));
             }
