@@ -7,6 +7,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+#define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE*>(alloca(sizeof(TYPE) * (LENGTH)))
+
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
          typename TPrinter = DefaultPrinter>

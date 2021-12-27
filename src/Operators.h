@@ -9,8 +9,6 @@
 #include <unordered_map>
 #include <vector>
 
-#define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE*>(alloca(sizeof(TYPE) * (LENGTH)))
-
 /* ********** */
 
 class Operator;
