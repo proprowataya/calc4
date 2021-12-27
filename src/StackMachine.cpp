@@ -91,7 +91,7 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
 
     for (size_t i = 0; i < userDefinedOperators.size(); i++)
     {
-        int startAddress = index;
+        int startAddress = static_cast<int>(index);
         startAddresses[i] = startAddress;
 
         auto& operations = userDefinedOperators[i].GetOperations();
