@@ -6,13 +6,14 @@
 #include <cassert>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 /* ********** */
 
 class Token;
-std::vector<std::shared_ptr<Token>> Lex(const std::string& text, CompilationContext& context);
+std::vector<std::shared_ptr<Token>> Lex(std::string_view text, CompilationContext& context);
 std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
                                       CompilationContext& context);
 

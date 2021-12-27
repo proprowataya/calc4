@@ -24,6 +24,13 @@ std::string TrimWhiteSpaces(const std::string& str);
 std::ostream& operator<<(std::ostream& dest, __int128_t value);
 #endif // ENABLE_INT128
 
+struct CharPosition
+{
+    size_t index;
+    int lineNo;
+    int charNo;
+};
+
 class AnyNumber
 {
 private:

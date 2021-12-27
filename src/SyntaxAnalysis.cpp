@@ -6,6 +6,7 @@
 #include <cassert>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -16,17 +17,119 @@ std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Toke
 void GenerateUserDefinedCodes(const std::vector<std::shared_ptr<Token>>& tokens,
                               CompilationContext& context);
 
+// TODO: TryPeek(length) and Read(length) do not always return the same substring due to inadequate
+// handling of Windows style line endings.
+class StringReader
+{
+private:
+    std::string_view text;
+    size_t index;
+    int lineNo;
+    int charNo;
+
+public:
+    StringReader(std::string_view text) : text(text), index(0), lineNo(0), charNo(0) {}
+
+    char Peek() const
+    {
+        assert(!Eof());
+        return text[index];
+    }
+
+    char TryPeek() const
+    {
+        if (Eof())
+        {
+            return static_cast<char>(-1);
+        }
+
+        return text[index];
+    }
+
+    std::string_view TryPeek(size_t length) const
+    {
+        if (Eof())
+        {
+            return std::string_view{};
+        }
+
+        return text.substr(index, length);
+    }
+
+    char Read()
+    {
+        assert(!Eof());
+
+        char c = text[index++];
+        charNo++;
+        if (c == '\n' || c == '\r')
+        {
+            // Reached end of line
+            lineNo++;
+            charNo = 0;
+
+            if (c == '\r' && Peek() == '\n')
+            {
+                // This line ending is Windows style
+                index++;
+            }
+        }
+
+        return c;
+    }
+
+    std::string_view Read(size_t length)
+    {
+        size_t startIndex = index;
+
+        for (size_t i = 0; i < length; i++)
+        {
+            Read();
+        }
+
+        return text.substr(startIndex, index - startIndex);
+    }
+
+    template<typename TPred>
+    std::string_view ReadWhile(TPred pred)
+    {
+        size_t startIndex = index;
+
+        while (!Eof() && pred(Peek()))
+        {
+            Read();
+        }
+
+        return text.substr(startIndex, index - startIndex);
+    }
+
+    bool Eof() const
+    {
+        return index >= text.length();
+    }
+
+    CharPosition GetCurrentPosition() const
+    {
+        return { index, lineNo, charNo };
+    }
+};
+
 class LexerImplement
 {
 public:
-    const std::string& text;
+    StringReader reader;
     CompilationContext& context;
     const std::vector<std::string>& arguments;
-    size_t index;
 
-    LexerImplement(const std::string& text, CompilationContext& context,
+    LexerImplement(std::string_view text, CompilationContext& context,
                    const std::vector<std::string>& arguments)
-        : text(text), context(context), arguments(arguments), index(0)
+        : reader(text), context(context), arguments(arguments)
+    {
+    }
+
+    LexerImplement(const StringReader& reader, CompilationContext& context,
+                   const std::vector<std::string>& arguments)
+        : reader(reader), context(context), arguments(arguments)
     {
     }
 
@@ -34,13 +137,13 @@ public:
     {
         std::vector<std::shared_ptr<Token>> vec;
 
-        while (index < text.length() && text[index] != ')')
+        while (!reader.Eof() && reader.Peek() != ')')
         {
-            char c = text[index];
+            char c = reader.Peek();
             if (c == ' ' || c == '\n' || c == '\r')
             {
                 // Skip whitespaces and line separators
-                index++;
+                reader.Read();
                 continue;
             }
 
@@ -52,7 +155,7 @@ public:
 
     std::shared_ptr<Token> NextToken()
     {
-        switch (text[index])
+        switch (reader.Peek())
         {
         case 'D':
             return LexDefineToken();
@@ -86,8 +189,8 @@ public:
 
     std::shared_ptr<DefineToken> LexDefineToken()
     {
-        assert(text[index] == 'D');
-        index++;
+        assert(reader.Peek() == 'D');
+        reader.Read();
 
         std::string supplementaryText = LexSupplementaryText();
 
@@ -119,156 +222,163 @@ public:
         auto tokens = LexerImplement(splitted[2], context, arguments).Lex();
 
         /* ***** Construct token ***** */
-        return std::make_shared<DefineToken>(name, arguments, tokens, LexSupplementaryText());
+        return std::make_shared<DefineToken>(name, arguments, tokens, std::move(supplementaryText));
     }
 
     std::shared_ptr<LoadVariableToken> LexLoadVariableToken()
     {
-        index++;
+        reader.Read();
         return std::make_shared<LoadVariableToken>(LexSupplementaryText());
     }
 
     std::shared_ptr<StoreVariableToken> LexStoreVariableToken()
     {
-        index++;
+        reader.Read();
         return std::make_shared<StoreVariableToken>(LexSupplementaryText());
     }
 
     std::shared_ptr<PrintCharToken> LexPrintCharToken()
     {
-        index++;
+        reader.Read();
         return std::make_shared<PrintCharToken>(LexSupplementaryText());
     }
 
     std::shared_ptr<LoadArrayToken> LexLoadArrayToken()
     {
-        index++;
+        reader.Read();
         return std::make_shared<LoadArrayToken>(LexSupplementaryText());
     }
 
     std::shared_ptr<DecimalToken> LexDecimalToken()
     {
-        int value = text[index++] - '0';
+        int value = reader.Read() - '0';
         return std::make_shared<DecimalToken>(value, LexSupplementaryText());
     }
 
     std::shared_ptr<Token> LexUserDefinedOperatorOrArgumentToken()
     {
-        assert(text[index] == '{');
-        index++;
+        assert(reader.Peek() == '{');
+        reader.Read();
 
-        /* ***** Find begin/end indexes of an identifier ***** */
-        size_t begin = index;
-        size_t end = text.find_first_of('}', begin);
-        if (end == std::string::npos)
+        /* ***** Get identifier's name ***** */
+        bool success = false;
+        std::string_view name = reader.ReadWhile([&success](char c) {
+            if (c == '}')
+            {
+                // Successfully reached end of bracket
+                success = true;
+                return false;
+            }
+
+            // Continue to scan next
+            return true;
+        });
+
+        if (!success)
         {
             throw ErrorMessage::TokenExpected("}");
         }
 
-        /* ***** Get identifier's name ***** */
-        std::string name = text.substr(begin, end - begin);
-        index = end + 1;
+        reader.Read(); // '}'
         return LexTokenFromGivenName(name);
     }
 
     std::shared_ptr<ParenthesisToken> LexParenthesisToken()
     {
-        assert(text[index] == '(');
-        index++;
+        assert(reader.Peek() == '(');
+        reader.Read();
 
         /* ***** Lex internal text ***** */
-        LexerImplement implement(text, context, arguments);
-        implement.index = index;
+        LexerImplement implement(reader, context, arguments);
         auto tokens = implement.Lex();
-        index = implement.index;
+        reader = implement.reader;
 
-        /* ***** Ensure that text[index] == ')' ***** */
-        if (index >= text.length() || text[index] != ')')
+        /* ***** Ensure that reader.Peek() == ')' ***** */
+        if (reader.Eof() || reader.Peek() != ')')
         {
             throw ErrorMessage::TokenExpected(")");
         }
 
-        index++; // ')'
+        reader.Read(); // ')'
         return std::make_shared<ParenthesisToken>(tokens, LexSupplementaryText());
     }
 
     std::shared_ptr<Token> LexSymbolOrArgumentToken()
     {
         /* ***** Try lex as two-letter symbol ***** */
-        if (index + 1 < text.length())
+        std::string_view substr = reader.TryPeek(2);
+        if (substr.length() == 2)
         {
-            std::string substr = text.substr(index, 2);
             if (substr == "==")
             {
-                index += 2;
+                reader.Read(2);
                 return std::make_shared<BinaryOperatorToken>(BinaryType::Equal,
                                                              LexSupplementaryText());
             }
             else if (substr == "!=")
             {
-                index += 2;
+                reader.Read(2);
                 return std::make_shared<BinaryOperatorToken>(BinaryType::NotEqual,
                                                              LexSupplementaryText());
             }
             else if (substr == ">=")
             {
-                index += 2;
+                reader.Read(2);
                 return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThanOrEqual,
                                                              LexSupplementaryText());
             }
             else if (substr == "<=")
             {
-                index += 2;
+                reader.Read(2);
                 return std::make_shared<BinaryOperatorToken>(BinaryType::LessThanOrEqual,
                                                              LexSupplementaryText());
             }
             else if (substr == "->")
             {
-                index += 2;
+                reader.Read(2);
                 return std::make_shared<StoreArrayToken>(LexSupplementaryText());
             }
         }
 
         /* ***** Try lex as one-letter symbol ***** */
-        switch (text[index])
+        switch (reader.Peek())
         {
         case '+':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::Add, LexSupplementaryText());
         case '-':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::Sub, LexSupplementaryText());
         case '*':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::Mult, LexSupplementaryText());
         case '/':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::Div, LexSupplementaryText());
         case '%':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::Mod, LexSupplementaryText());
         case '<':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::LessThan,
                                                          LexSupplementaryText());
         case '>':
-            index++;
+            reader.Read();
             return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThan,
                                                          LexSupplementaryText());
         case '?':
-            index++;
+            reader.Read();
             return std::make_shared<ConditionalOperatorToken>(LexSupplementaryText());
         default:
             break;
         }
 
         /* ***** Get identifier's name ***** */
-        std::string name = text.substr(index, 1);
-        index++;
+        std::string_view name = reader.Read(1);
         return LexTokenFromGivenName(name);
     }
 
-    std::shared_ptr<Token> LexTokenFromGivenName(const std::string& name)
+    std::shared_ptr<Token> LexTokenFromGivenName(std::string_view name)
     {
         /* ***** Try lex as user-defined operator ***** */
         if (auto implement = context.TryGetOperatorImplement(name))
@@ -287,30 +397,27 @@ public:
             {
                 /* It has been found so it is an argument ***** */
                 int index = static_cast<int>(std::distance(arguments.begin(), it));
-                return std::make_shared<ArgumentToken>(name, index, LexSupplementaryText());
+                return std::make_shared<ArgumentToken>(std::string(name), index,
+                                                       LexSupplementaryText());
             }
             else
             {
-                throw ErrorMessage::OperatorOrOperandNotDefined(name);
+                throw ErrorMessage::OperatorOrOperandNotDefined(std::string(name));
             }
         }
     }
 
     std::string LexSupplementaryText()
     {
-        if (index >= text.length() || text[index] != '[')
+        if (reader.Eof() || reader.Peek() != '[')
         {
             return std::string();
         }
 
-        index++;
-        size_t begin = index;
+        reader.Read(); // '['
         int depth = 1;
 
-        while (index < text.length() && depth > 0)
-        {
-            char c = text[index];
-
+        std::string_view supplementaryText = reader.ReadWhile([&depth](char c) {
             if (c == '[')
             {
                 depth++;
@@ -320,16 +427,16 @@ public:
                 depth--;
             }
 
-            index++;
-        }
+            return depth > 0;
+        });
 
         if (depth != 0)
         {
             throw ErrorMessage::TokenExpected("]");
         }
 
-        size_t end = index - 1;
-        return text.substr(begin, end - begin);
+        reader.Read(); // ']'
+        return std::string(supplementaryText);
     }
 };
 
@@ -477,14 +584,14 @@ void GenerateUserDefinedCodes(const std::vector<std::shared_ptr<Token>>& tokens,
 }
 }
 
-std::vector<std::shared_ptr<Token>> Lex(const std::string& text, CompilationContext& context)
+std::vector<std::shared_ptr<Token>> Lex(std::string_view text, CompilationContext& context)
 {
     std::vector<std::string> emptyVector;
     LexerImplement implement(text, context, emptyVector);
     auto result = implement.Lex();
-    if (implement.index < text.length())
+    if (!implement.reader.Eof())
     {
-        throw ErrorMessage::UnexpectedToken(text[implement.index]);
+        throw ErrorMessage::UnexpectedToken(implement.reader.Peek());
     }
 
     return result;
