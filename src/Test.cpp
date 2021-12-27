@@ -1,5 +1,6 @@
 #include "Test.h"
 #include "Evaluator.h"
+#include "Exceptions.h"
 #include "Operators.h"
 #include "Optimizer.h"
 #include "StackMachine.h"
@@ -246,10 +247,10 @@ void TestOne(TestCase test, TestResult& testResult)
                     testResult.success++;
                 }
             }
-            catch (std::string& error)
+            catch (Exceptions::Calc4Exception& error)
             {
                 PrintTestDescription();
-                cout << "---> [Failed] Exception \"" << error << "\"" << endl;
+                cout << "---> [Failed] Exception \"" << error.what() << "\"" << endl;
                 testResult.fail++;
             }
             catch (std::exception& exception)

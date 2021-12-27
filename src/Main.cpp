@@ -1,4 +1,5 @@
 ﻿#include "Evaluator.h"
+#include "Exceptions.h"
 #include "Operators.h"
 #include "Optimizer.h"
 #include "StackMachine.h"
@@ -455,9 +456,17 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
              << endl
              << endl;
     }
-    catch (std::string& error)
+    catch (Exceptions::Calc4Exception& error)
     {
-        cout << "Error: " << error << endl << endl;
+        cout << "Error: ";
+
+        if (auto position = error.GetPosition())
+        {
+            cout << "[Line: " << position.value().lineNo << ", Column: " << position.value().charNo
+                 << "] ";
+        }
+
+        cout << error.what() << endl << endl;
     }
 }
 

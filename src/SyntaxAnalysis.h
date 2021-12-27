@@ -21,7 +21,18 @@ std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>&
 
 class Token
 {
+private:
+    CharPosition position;
+
+protected:
+    Token(const CharPosition& position) : position(position) {}
+
 public:
+    const CharPosition& GetPosition() const
+    {
+        return position;
+    }
+
     virtual int GetNumOperands() const = 0;
     virtual const std::string& GetSupplementaryText() const = 0;
     virtual std::shared_ptr<const Operator> CreateOperator(
@@ -50,8 +61,9 @@ private:
     std::string supplementaryText;
 
 public:
-    ArgumentToken(const std::string& name, int index, const std::string& supplementaryText)
-        : name(name), index(index), supplementaryText(supplementaryText)
+    ArgumentToken(const CharPosition& position, const std::string& name, int index,
+                  const std::string& supplementaryText)
+        : Token(position), name(name), index(index), supplementaryText(supplementaryText)
     {
     }
 
@@ -85,10 +97,12 @@ private:
     std::string supplementaryText;
 
 public:
-    DefineToken(const std::string& name, const std::vector<std::string>& arguments,
+    DefineToken(const CharPosition& position, const std::string& name,
+                const std::vector<std::string>& arguments,
                 const std::vector<std::shared_ptr<Token>>& tokens,
                 const std::string& supplementaryText)
-        : name(name), arguments(arguments), tokens(tokens), supplementaryText(supplementaryText)
+        : Token(position), name(name), arguments(arguments), tokens(tokens),
+          supplementaryText(supplementaryText)
     {
     }
 
@@ -124,7 +138,8 @@ private:
     std::string supplementaryText;
 
 public:
-    LoadVariableToken(const std::string& supplementaryText) : supplementaryText(supplementaryText)
+    LoadVariableToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
     {
     }
 
@@ -151,9 +166,10 @@ private:
     std::string supplementaryText;
 
 public:
-    ParenthesisToken(const std::vector<std::shared_ptr<Token>>& tokens,
+    ParenthesisToken(const CharPosition& position,
+                     const std::vector<std::shared_ptr<Token>>& tokens,
                      const std::string& supplementaryText)
-        : tokens(tokens), supplementaryText(supplementaryText)
+        : Token(position), tokens(tokens), supplementaryText(supplementaryText)
     {
     }
 
@@ -180,8 +196,8 @@ private:
     std::string supplementaryText;
 
 public:
-    DecimalToken(int value, const std::string& supplementaryText)
-        : value(value), supplementaryText(supplementaryText)
+    DecimalToken(const CharPosition& position, int value, const std::string& supplementaryText)
+        : Token(position), value(value), supplementaryText(supplementaryText)
     {
     }
 
@@ -207,7 +223,8 @@ private:
     std::string supplementaryText;
 
 public:
-    StoreVariableToken(const std::string& supplementaryText) : supplementaryText(supplementaryText)
+    StoreVariableToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
     {
     }
 
@@ -233,7 +250,10 @@ private:
     std::string supplementaryText;
 
 public:
-    LoadArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+    LoadArrayToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
+    {
+    }
 
     virtual std::shared_ptr<const Operator> CreateOperator(
         const std::vector<std::shared_ptr<const Operator>>& operands,
@@ -252,7 +272,10 @@ private:
     std::string supplementaryText;
 
 public:
-    PrintCharToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+    PrintCharToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
+    {
+    }
 
     virtual std::shared_ptr<const Operator> CreateOperator(
         const std::vector<std::shared_ptr<const Operator>>& operands,
@@ -272,8 +295,9 @@ private:
     std::string supplementaryText;
 
 public:
-    BinaryOperatorToken(BinaryType type, const std::string& supplementaryText)
-        : type(type), supplementaryText(supplementaryText)
+    BinaryOperatorToken(const CharPosition& position, BinaryType type,
+                        const std::string& supplementaryText)
+        : Token(position), type(type), supplementaryText(supplementaryText)
     {
     }
 
@@ -299,7 +323,10 @@ private:
     std::string supplementaryText;
 
 public:
-    StoreArrayToken(const std::string& supplementaryText) : supplementaryText(supplementaryText) {}
+    StoreArrayToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
+    {
+    }
 
     virtual std::shared_ptr<const Operator> CreateOperator(
         const std::vector<std::shared_ptr<const Operator>>& operands,
@@ -318,8 +345,8 @@ private:
     std::string supplementaryText;
 
 public:
-    ConditionalOperatorToken(const std::string& supplementaryText)
-        : supplementaryText(supplementaryText)
+    ConditionalOperatorToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
     {
     }
 
@@ -341,9 +368,9 @@ private:
     std::string supplementaryText;
 
 public:
-    UserDefinedOperatorToken(const OperatorDefinition& definition,
+    UserDefinedOperatorToken(const CharPosition& position, const OperatorDefinition& definition,
                              const std::string& supplementaryText)
-        : definition(definition), supplementaryText(supplementaryText)
+        : Token(position), definition(definition), supplementaryText(supplementaryText)
     {
     }
 

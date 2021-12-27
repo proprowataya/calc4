@@ -1,6 +1,6 @@
 #include "StackMachine.h"
 #include "Common.h"
-#include "Error.h"
+#include "Exceptions.h"
 #include "ExecutionState.h"
 #include "Operators.h"
 #include <algorithm>
@@ -496,8 +496,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
             int newStackSize = stackSize + value;
             if (newStackSize < 0)
             {
-                throw ErrorMessage::AssertionError("Stack size is negative: " +
-                                                   std::to_string(newStackSize));
+                throw Exceptions::AssertionErrorException(
+                    std::nullopt, "Stack size is negative: " + std::to_string(newStackSize));
             }
 
             maxStackSize = std::max(stackSize, newStackSize);
@@ -605,8 +605,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
 
         if (generator.stackSize != 0)
         {
-            throw ErrorMessage::AssertionError("Stacksize is not zero: " +
-                                               std::to_string(generator.stackSize));
+            throw Exceptions::AssertionErrorException(
+                std::nullopt, "Stacksize is not zero: " + std::to_string(generator.stackSize));
         }
 
         userDefinedOperators.emplace_back(implement.GetDefinition(),
@@ -766,12 +766,12 @@ TNumber ExecuteStackMachineModule(
             // Check stack overflow
             if (top + maxStackSizes[op->value] >= &*stack.end())
             {
-                throw ErrorMessage::StackOverflow();
+                throw Exceptions::StackOverflowException(std::nullopt);
             }
 
             if (ptrTop + 2 >= &*ptrStack.end())
             {
-                throw ErrorMessage::StackOverflow();
+                throw Exceptions::StackOverflowException(std::nullopt);
             }
 
             // Push current program counter

@@ -30,7 +30,6 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
-#include "Error.h"
 #include "Jit.h"
 #include "Operators.h"
 

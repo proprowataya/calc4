@@ -1,6 +1,6 @@
 ﻿#include "SyntaxAnalysis.h"
 #include "Common.h"
-#include "Error.h"
+#include "Exceptions.h"
 #include "Operators.h"
 #include <algorithm>
 #include <cassert>
@@ -190,6 +190,7 @@ public:
     std::shared_ptr<DefineToken> LexDefineToken()
     {
         assert(reader.Peek() == 'D');
+        auto position = reader.GetCurrentPosition();
         reader.Read();
 
         std::string supplementaryText = LexSupplementaryText();
@@ -198,7 +199,8 @@ public:
         std::vector<std::string> splitted = Split(supplementaryText, '|');
         if (splitted.size() != 3)
         {
-            throw ErrorMessage::DefinitionTextNotSplittedProperly(supplementaryText);
+            throw Exceptions::DefinitionTextNotSplittedProperlyException(position,
+                                                                         supplementaryText);
         }
 
         /* ***** Split arguments ***** */
@@ -222,42 +224,49 @@ public:
         auto tokens = LexerImplement(splitted[2], context, arguments).Lex();
 
         /* ***** Construct token ***** */
-        return std::make_shared<DefineToken>(name, arguments, tokens, std::move(supplementaryText));
+        return std::make_shared<DefineToken>(position, name, arguments, tokens,
+                                             std::move(supplementaryText));
     }
 
     std::shared_ptr<LoadVariableToken> LexLoadVariableToken()
     {
+        auto position = reader.GetCurrentPosition();
         reader.Read();
-        return std::make_shared<LoadVariableToken>(LexSupplementaryText());
+        return std::make_shared<LoadVariableToken>(position, LexSupplementaryText());
     }
 
     std::shared_ptr<StoreVariableToken> LexStoreVariableToken()
     {
+        auto position = reader.GetCurrentPosition();
         reader.Read();
-        return std::make_shared<StoreVariableToken>(LexSupplementaryText());
+        return std::make_shared<StoreVariableToken>(position, LexSupplementaryText());
     }
 
     std::shared_ptr<PrintCharToken> LexPrintCharToken()
     {
+        auto position = reader.GetCurrentPosition();
         reader.Read();
-        return std::make_shared<PrintCharToken>(LexSupplementaryText());
+        return std::make_shared<PrintCharToken>(position, LexSupplementaryText());
     }
 
     std::shared_ptr<LoadArrayToken> LexLoadArrayToken()
     {
+        auto position = reader.GetCurrentPosition();
         reader.Read();
-        return std::make_shared<LoadArrayToken>(LexSupplementaryText());
+        return std::make_shared<LoadArrayToken>(position, LexSupplementaryText());
     }
 
     std::shared_ptr<DecimalToken> LexDecimalToken()
     {
+        auto position = reader.GetCurrentPosition();
         int value = reader.Read() - '0';
-        return std::make_shared<DecimalToken>(value, LexSupplementaryText());
+        return std::make_shared<DecimalToken>(position, value, LexSupplementaryText());
     }
 
     std::shared_ptr<Token> LexUserDefinedOperatorOrArgumentToken()
     {
         assert(reader.Peek() == '{');
+        auto position = reader.GetCurrentPosition();
         reader.Read();
 
         /* ***** Get identifier's name ***** */
@@ -276,16 +285,17 @@ public:
 
         if (!success)
         {
-            throw ErrorMessage::TokenExpected("}");
+            throw Exceptions::TokenExpectedException(reader.GetCurrentPosition(), "}");
         }
 
         reader.Read(); // '}'
-        return LexTokenFromGivenName(name);
+        return LexTokenFromGivenName(position, name);
     }
 
     std::shared_ptr<ParenthesisToken> LexParenthesisToken()
     {
         assert(reader.Peek() == '(');
+        auto position = reader.GetCurrentPosition();
         reader.Read();
 
         /* ***** Lex internal text ***** */
@@ -296,15 +306,17 @@ public:
         /* ***** Ensure that reader.Peek() == ')' ***** */
         if (reader.Eof() || reader.Peek() != ')')
         {
-            throw ErrorMessage::TokenExpected(")");
+            throw Exceptions::TokenExpectedException(reader.GetCurrentPosition(), ")");
         }
 
         reader.Read(); // ')'
-        return std::make_shared<ParenthesisToken>(tokens, LexSupplementaryText());
+        return std::make_shared<ParenthesisToken>(position, tokens, LexSupplementaryText());
     }
 
     std::shared_ptr<Token> LexSymbolOrArgumentToken()
     {
+        auto position = reader.GetCurrentPosition();
+
         /* ***** Try lex as two-letter symbol ***** */
         std::string_view substr = reader.TryPeek(2);
         if (substr.length() == 2)
@@ -312,31 +324,31 @@ public:
             if (substr == "==")
             {
                 reader.Read(2);
-                return std::make_shared<BinaryOperatorToken>(BinaryType::Equal,
+                return std::make_shared<BinaryOperatorToken>(position, BinaryType::Equal,
                                                              LexSupplementaryText());
             }
             else if (substr == "!=")
             {
                 reader.Read(2);
-                return std::make_shared<BinaryOperatorToken>(BinaryType::NotEqual,
+                return std::make_shared<BinaryOperatorToken>(position, BinaryType::NotEqual,
                                                              LexSupplementaryText());
             }
             else if (substr == ">=")
             {
                 reader.Read(2);
-                return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThanOrEqual,
-                                                             LexSupplementaryText());
+                return std::make_shared<BinaryOperatorToken>(
+                    position, BinaryType::GreaterThanOrEqual, LexSupplementaryText());
             }
             else if (substr == "<=")
             {
                 reader.Read(2);
-                return std::make_shared<BinaryOperatorToken>(BinaryType::LessThanOrEqual,
+                return std::make_shared<BinaryOperatorToken>(position, BinaryType::LessThanOrEqual,
                                                              LexSupplementaryText());
             }
             else if (substr == "->")
             {
                 reader.Read(2);
-                return std::make_shared<StoreArrayToken>(LexSupplementaryText());
+                return std::make_shared<StoreArrayToken>(position, LexSupplementaryText());
             }
         }
 
@@ -345,45 +357,51 @@ public:
         {
         case '+':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::Add, LexSupplementaryText());
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::Add,
+                                                         LexSupplementaryText());
         case '-':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::Sub, LexSupplementaryText());
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::Sub,
+                                                         LexSupplementaryText());
         case '*':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::Mult, LexSupplementaryText());
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::Mult,
+                                                         LexSupplementaryText());
         case '/':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::Div, LexSupplementaryText());
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::Div,
+                                                         LexSupplementaryText());
         case '%':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::Mod, LexSupplementaryText());
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::Mod,
+                                                         LexSupplementaryText());
         case '<':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::LessThan,
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::LessThan,
                                                          LexSupplementaryText());
         case '>':
             reader.Read();
-            return std::make_shared<BinaryOperatorToken>(BinaryType::GreaterThan,
+            return std::make_shared<BinaryOperatorToken>(position, BinaryType::GreaterThan,
                                                          LexSupplementaryText());
         case '?':
             reader.Read();
-            return std::make_shared<ConditionalOperatorToken>(LexSupplementaryText());
+            return std::make_shared<ConditionalOperatorToken>(position, LexSupplementaryText());
         default:
             break;
         }
 
         /* ***** Get identifier's name ***** */
         std::string_view name = reader.Read(1);
-        return LexTokenFromGivenName(name);
+        return LexTokenFromGivenName(position, name);
     }
 
-    std::shared_ptr<Token> LexTokenFromGivenName(std::string_view name)
+    std::shared_ptr<Token> LexTokenFromGivenName(const CharPosition& position,
+                                                 std::string_view name)
     {
         /* ***** Try lex as user-defined operator ***** */
         if (auto implement = context.TryGetOperatorImplement(name))
         {
-            return std::make_shared<UserDefinedOperatorToken>(implement->GetDefinition(),
+            return std::make_shared<UserDefinedOperatorToken>(position, implement->GetDefinition(),
                                                               LexSupplementaryText());
         }
         else
@@ -397,12 +415,12 @@ public:
             {
                 /* It has been found so it is an argument ***** */
                 int index = static_cast<int>(std::distance(arguments.begin(), it));
-                return std::make_shared<ArgumentToken>(std::string(name), index,
+                return std::make_shared<ArgumentToken>(position, std::string(name), index,
                                                        LexSupplementaryText());
             }
             else
             {
-                throw ErrorMessage::OperatorOrOperandNotDefined(std::string(name));
+                throw Exceptions::OperatorOrOperandNotDefinedException(position, std::string(name));
             }
         }
     }
@@ -432,7 +450,7 @@ public:
 
         if (depth != 0)
         {
-            throw ErrorMessage::TokenExpected("]");
+            throw Exceptions::TokenExpectedException(reader.GetCurrentPosition(), "]");
         }
 
         reader.Read(); // ']'
@@ -485,7 +503,8 @@ public:
             else
             {
                 // Otherwise, it is a syntax error
-                throw ErrorMessage::SomeOperandsMissing();
+                assert(index < tokens.size());
+                throw Exceptions::SomeOperandsMissingException(tokens[index]->GetPosition());
             }
         }
         else
@@ -510,7 +529,7 @@ public:
                 auto lower = ReadLower();
                 if (lower.empty())
                 {
-                    throw ErrorMessage::SomeOperandsMissing();
+                    throw Exceptions::SomeOperandsMissingException(token->GetPosition());
                 }
 
                 operands.push_back(ParseCore(lower, context));
@@ -560,7 +579,7 @@ std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Toke
     switch (operators.size())
     {
     case 0:
-        throw ErrorMessage::CodeIsEmpty();
+        throw Exceptions::CodeIsEmptyException(std::nullopt);
     case 1:
         return operators[0];
     default:
@@ -591,7 +610,8 @@ std::vector<std::shared_ptr<Token>> Lex(std::string_view text, CompilationContex
     auto result = implement.Lex();
     if (!implement.reader.Eof())
     {
-        throw ErrorMessage::UnexpectedToken(implement.reader.Peek());
+        throw Exceptions::UnexpectedTokenException(implement.reader.GetCurrentPosition(),
+                                                   implement.reader.Peek());
     }
 
     return result;
