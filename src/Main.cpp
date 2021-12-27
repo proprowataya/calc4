@@ -92,7 +92,7 @@ void PrintTree(const std::shared_ptr<const Operator>& op, int depth);
 bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context);
 bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
                               const CompilationContext& context,
-                              std::unordered_map<const OperatorDefinition*, int> called);
+                              std::unordered_map<const OperatorDefinition*, int>& called);
 const char* GetExecutionTypeString(ExecutionType type);
 
 int main(int argc, char** argv)
@@ -583,12 +583,13 @@ void PrintTree(const std::shared_ptr<const Operator>& op, int depth)
 
 bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context)
 {
-    return HasRecursiveCallInternal(op, context, {});
+    std::unordered_map<const OperatorDefinition*, int> called;
+    return HasRecursiveCallInternal(op, context, called);
 }
 
 bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
                               const CompilationContext& context,
-                              std::unordered_map<const OperatorDefinition*, int> called)
+                              std::unordered_map<const OperatorDefinition*, int>& called)
 {
     if (auto userDefined = std::dynamic_pointer_cast<const UserDefinedOperator>(op))
     {
