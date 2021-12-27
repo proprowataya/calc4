@@ -5,6 +5,7 @@
 #include <sstream>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -120,14 +121,16 @@ public:
         }
     }
 
-    const OperatorImplement& GetOperatorImplement(const std::string& name) const
+    const OperatorImplement& GetOperatorImplement(std::string_view name) const
     {
-        return userDefinedOperators.at(name);
+        // TODO: unnecessary allocation of string
+        return userDefinedOperators.at(std::string(name));
     }
 
-    const OperatorImplement* TryGetOperatorImplement(const std::string& name) const
+    const OperatorImplement* TryGetOperatorImplement(std::string_view name) const
     {
-        auto it = userDefinedOperators.find(name);
+        // TODO: unnecessary allocation of string
+        auto it = userDefinedOperators.find(std::string(name));
         if (it != userDefinedOperators.end())
         {
             return &(it->second);
