@@ -26,9 +26,19 @@ private:
     size_t index;
     int lineNo;
     int charNo;
+    size_t originalIndex;
 
 public:
-    StringReader(std::string_view text) : text(text), index(0), lineNo(0), charNo(0) {}
+    StringReader(std::string_view text)
+        : text(text), index(0), lineNo(0), charNo(0), originalIndex(0)
+    {
+    }
+
+    StringReader(std::string_view text, const CharPosition& originalPosition)
+        : text(text), index(0), lineNo(originalPosition.lineNo), charNo(originalPosition.charNo),
+          originalIndex(originalPosition.index)
+    {
+    }
 
     char Peek() const
     {
@@ -110,9 +120,37 @@ public:
 
     CharPosition GetCurrentPosition() const
     {
-        return { index, lineNo, charNo };
+        return { originalIndex + index, lineNo, charNo };
     }
 };
+
+std::vector<std::pair<std::string_view, CharPosition>> Split(StringReader& reader, char separator)
+{
+    if (reader.Eof())
+    {
+        return {};
+    }
+
+    std::vector<std::pair<std::string_view, CharPosition>> result;
+
+    while (true)
+    {
+        assert(!reader.Eof());
+        auto position = reader.GetCurrentPosition();
+        std::string_view substr = reader.ReadWhile([separator](char c) { return c != separator; });
+        result.emplace_back(substr, position);
+
+        if (reader.Eof())
+        {
+            break;
+        }
+
+        assert(reader.Peek() == separator);
+        reader.Read();
+    }
+
+    return result;
+}
 
 class LexerImplement
 {
@@ -193,10 +231,11 @@ public:
         auto position = reader.GetCurrentPosition();
         reader.Read();
 
-        std::string supplementaryText = LexSupplementaryText();
+        auto [supplementaryText, supplementaryTextPosition] = LexSupplementaryTextWithPosition();
 
         /* ***** Split supplementaryText into three strings ***** */
-        std::vector<std::string> splitted = Split(supplementaryText, '|');
+        StringReader supplementaryTextReader(supplementaryText, supplementaryTextPosition);
+        auto splitted = Split(supplementaryTextReader, '|');
         if (splitted.size() != 3)
         {
             throw Exceptions::DefinitionTextNotSplittedProperlyException(position,
@@ -204,27 +243,30 @@ public:
         }
 
         /* ***** Split arguments ***** */
-        std::vector<std::string> arguments = Split(splitted[1], ',');
+        StringReader argumentReader(splitted[1].first, splitted[1].second);
+        auto splittedArguments = Split(argumentReader, ',');
 
         /* ***** Trim arguments (e.g. "  x " => "x") ***** */
-        for (auto& arg : arguments)
+        std::vector<std::string> arguments;
+        for (auto& arg : splittedArguments)
         {
-            arg = TrimWhiteSpaces(arg);
+            arguments.emplace_back(TrimWhiteSpaces(arg.first));
         }
 
         /* ***** Operator name ***** */
         auto& name = splitted[0];
 
         /* ***** Update CompilationContext ***** */
-        OperatorDefinition definition(name, static_cast<int>(arguments.size()));
+        OperatorDefinition definition(std::string(name.first), static_cast<int>(arguments.size()));
         OperatorImplement implement(definition, nullptr);
         context.AddOperatorImplement(implement);
 
         /* ***** Lex internal text ***** */
-        auto tokens = LexerImplement(splitted[2], context, arguments).Lex();
+        StringReader internalTextReader(splitted[2].first, splitted[2].second);
+        auto tokens = LexerImplement(internalTextReader, context, arguments).Lex();
 
         /* ***** Construct token ***** */
-        return std::make_shared<DefineToken>(position, name, arguments, tokens,
+        return std::make_shared<DefineToken>(position, std::string(name.first), arguments, tokens,
                                              std::move(supplementaryText));
     }
 
@@ -427,12 +469,19 @@ public:
 
     std::string LexSupplementaryText()
     {
+        return LexSupplementaryTextWithPosition().first;
+    }
+
+    std::pair<std::string, CharPosition> LexSupplementaryTextWithPosition()
+    {
         if (reader.Eof() || reader.Peek() != '[')
         {
-            return std::string();
+            // TODO: Inappropriate returning value
+            return std::make_pair(std::string(), CharPosition{});
         }
 
         reader.Read(); // '['
+        auto position = reader.GetCurrentPosition();
         int depth = 1;
 
         std::string_view supplementaryText = reader.ReadWhile([&depth](char c) {
@@ -454,7 +503,7 @@ public:
         }
 
         reader.Read(); // ']'
-        return std::string(supplementaryText);
+        return std::make_pair(std::string(supplementaryText), position);
     }
 };
 

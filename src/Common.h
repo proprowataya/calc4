@@ -5,6 +5,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifndef NDEBUG
@@ -17,8 +18,7 @@
 #endif // _MSC_VER
 #endif // !NDEBUG
 
-std::vector<std::string> Split(const std::string& str, char c);
-std::string TrimWhiteSpaces(const std::string& str);
+std::string_view TrimWhiteSpaces(std::string_view str);
 
 #ifdef ENABLE_INT128
 std::ostream& operator<<(std::ostream& dest, __int128_t value);
