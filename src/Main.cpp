@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -82,7 +83,7 @@ template<typename TNumber>
 void RunAsRepl(Option& option);
 
 template<typename TNumber>
-void ExecuteCore(const std::string& source, CompilationContext& context,
+void ExecuteCore(std::string_view source, std::string_view filePath, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option);
 
 inline const char* GetIntegerSizeDescription(int size);
@@ -287,7 +288,7 @@ void RunSources(const Option& option, const std::vector<const char*>& sources)
 
         CompilationContext context;
         ExecutionState<TNumber> state;
-        ExecuteCore(source, context, state, option);
+        ExecuteCore(source, path, context, state, option);
     }
 }
 
@@ -344,12 +345,12 @@ void RunAsRepl(Option& option)
             continue;
         }
 
-        ExecuteCore<TNumber>(line, context, state, option);
+        ExecuteCore<TNumber>(line, "repl-input", context, state, option);
     }
 }
 
 template<typename TNumber>
-void ExecuteCore(const std::string& source, CompilationContext& context,
+void ExecuteCore(std::string_view source, std::string_view filePath, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option)
 {
     using namespace std;
@@ -458,15 +459,39 @@ void ExecuteCore(const std::string& source, CompilationContext& context,
     }
     catch (Exceptions::Calc4Exception& error)
     {
-        cout << "Error: ";
+        cout << filePath;
 
-        if (auto position = error.GetPosition())
+        auto& position = error.GetPosition();
+        if (position)
         {
-            cout << "[Line: " << position.value().lineNo << ", Column: " << position.value().charNo
-                 << "] ";
+            cout << ":" << (position->lineNo + 1) << ":" << (position->charNo + 1) << ":";
         }
 
-        cout << error.what() << endl << endl;
+        cout << " Error: " << error.what() << endl;
+
+        if (position)
+        {
+            size_t lineStartIndex = source.substr(0, position->index).find_last_of("\r\n");
+            lineStartIndex = lineStartIndex == source.npos ? 0 : (lineStartIndex + 1);
+
+            size_t lineEndIndex = source.find_first_of("\r\n", position->index);
+            lineEndIndex = lineEndIndex == source.npos ? source.length() : lineEndIndex;
+
+            std::string_view line = source.substr(lineStartIndex, lineEndIndex - lineStartIndex);
+
+            static constexpr int LineNoWidth = 8;
+            static constexpr std::string_view Splitter = " | ";
+            cout << std::right << std::setw(LineNoWidth) << (position->lineNo + 1) << Splitter
+                 << line << endl;
+            for (int i = 0;
+                 i < LineNoWidth + static_cast<int>(Splitter.length()) + position->charNo; i++)
+            {
+                cout << ' ';
+            }
+            cout << '^' << endl;
+        }
+
+        cout << endl;
     }
 }
 
