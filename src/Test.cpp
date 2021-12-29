@@ -59,6 +59,8 @@ constexpr TestCase TestCases[] = {
     { "1+2*3-10", -1 },
     { "0?1?2?3?4", 3 },
     { "72P101P108P108P111P10P", 0, "Hello\n" },
+    { "1+// C++ style comment\n2", 3 },
+    { "1+/* C style comment*/2", 3 },
     { "D[print||72P101P108P108P111P10P] {print}", 0, "Hello\n" },
     { "D[add|x,y|x+y] 12{add}23", 35 },
     { "D[get12345||12345] {get12345}+{get12345}", 24690 },

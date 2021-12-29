@@ -184,6 +184,35 @@ public:
                 reader.Read();
                 continue;
             }
+            else if (reader.TryPeek(2) == "/*")
+            {
+                // C style comment
+                reader.Read(2);
+
+                // Skip characters to the end of this comment
+                char last = '\0';
+                reader.ReadWhile([&last](char c) {
+                    bool stopReading = (last == '*' && c == '/');
+                    last = c;
+                    return !stopReading;
+                });
+
+                assert(reader.Peek() == '/');
+                reader.Read();
+                continue;
+            }
+            else if (reader.TryPeek(2) == "//")
+            {
+                // C++ style comment
+                reader.Read(2);
+
+                // Skip characters to the end of this comment
+                reader.ReadWhile([](char c) { return c != '\n' && c != '\r'; });
+
+                assert(reader.Eof() || reader.Peek() == '\n' || reader.Peek() == '\r');
+                reader.Read();
+                continue;
+            }
 
             vec.push_back(NextToken());
         }
