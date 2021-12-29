@@ -26,6 +26,7 @@
 #endif // ENABLE_GMP
 
 constexpr const char* ProgramName = "Calc4 REPL";
+constexpr const char* Indent = "    ";
 
 #ifdef ENABLE_GMP
 constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
@@ -89,7 +90,13 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
 inline const char* GetIntegerSizeDescription(int size);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
-void PrintTree(const std::shared_ptr<const Operator>& op, int depth);
+void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op);
+void PrintTreeCore(const std::shared_ptr<const Operator>& op, int depth);
+
+template<typename TNumber>
+void PrintStackMachineModule(const StackMachineModule<TNumber>& module);
+
+void PrintStackMachineOperations(const std::vector<StackMachineOperation>& operations);
 bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context);
 bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
                               const CompilationContext& context,
@@ -374,26 +381,8 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
 
         if (option.printInfo)
         {
-            cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl;
-
-            cout << "Tree:" << endl
-                 << "---------------------------" << endl
-                 << "Module {" << endl
-                 << "Main:" << endl;
-            PrintTree(op, 1);
-            cout << endl;
-
-            for (auto it = context.UserDefinedOperatorBegin();
-                 it != context.UserDefinedOperatorEnd(); it++)
-            {
-                auto& name = it->second.GetDefinition().GetName();
-                auto& op = it->second.GetOperator();
-
-                cout << name << ":" << endl;
-                PrintTree(op, 1);
-            }
-
-            cout << "}" << endl << "---------------------------" << endl << endl;
+            cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl << endl;
+            PrintTree(context, op);
         }
 
         ExecutionType actualExecutionEngine = option.executionType;
@@ -439,6 +428,12 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
         case ExecutionType::StackMachine:
         {
             auto module = GenerateStackMachineModule<TNumber>(op, context);
+
+            if (option.printInfo)
+            {
+                PrintStackMachineModule(module);
+            }
+
             result = ExecuteStackMachineModule(module, state);
             break;
         }
@@ -543,7 +538,6 @@ inline bool IsSupportedIntegerSize(int size)
 void PrintHelp(int argc, char** argv)
 {
     using namespace std;
-    static constexpr const char* Indent = "    ";
 
     cout << ProgramName << std::endl
          << std::endl
@@ -576,14 +570,34 @@ void PrintHelp(int argc, char** argv)
          << Indent << "Perform test" << endl;
 }
 
-void PrintTree(const std::shared_ptr<const Operator>& op, int depth)
+void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op)
+{
+    using std::cout;
+    using std::endl;
+
+    cout << "/*" << endl << " * Tree" << endl << " */" << endl << "{" << endl << "Main:" << endl;
+    PrintTreeCore(op, 1);
+
+    for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
+    {
+        auto& name = it->second.GetDefinition().GetName();
+        auto& op = it->second.GetOperator();
+
+        cout << endl << "Operator \"" << name << "\":" << endl;
+        PrintTreeCore(op, 1);
+    }
+
+    cout << "}" << endl << endl;
+}
+
+void PrintTreeCore(const std::shared_ptr<const Operator>& op, int depth)
 {
     using namespace std;
 
     auto PrintIndent = [depth]() {
         for (int i = 0; i < depth; i++)
         {
-            cout << "  ";
+            cout << Indent;
         }
     };
 
@@ -592,7 +606,7 @@ void PrintTree(const std::shared_ptr<const Operator>& op, int depth)
     cout << op->ToString() << endl;
     for (auto& operand : op->GetOperands())
     {
-        PrintTree(operand, depth + 1);
+        PrintTreeCore(operand, depth + 1);
     }
 
     if (auto parenthesis = std::dynamic_pointer_cast<const ParenthesisOperator>(op))
@@ -601,8 +615,57 @@ void PrintTree(const std::shared_ptr<const Operator>& op, int depth)
         cout << "Contains:" << endl;
         for (auto& op2 : parenthesis->GetOperators())
         {
-            PrintTree(op2, depth + 1);
+            PrintTreeCore(op2, depth + 1);
         }
+    }
+}
+
+template<typename TNumber>
+void PrintStackMachineModule(const StackMachineModule<TNumber>& module)
+{
+    using std::cout;
+    using std::endl;
+
+    cout << "/*" << endl << " * Stack Machine Codes" << endl << " */" << endl << "{" << endl;
+
+    cout << "Main:" << endl;
+    PrintStackMachineOperations(module.GetEntryPoint());
+
+    auto& userDefinedOperators = module.GetUserDefinedOperators();
+    for (size_t i = 0; i < userDefinedOperators.size(); i++)
+    {
+        auto& userDefined = userDefinedOperators[i];
+        cout << "Operator \"" << userDefined.GetDefinition().GetName() << "\""
+             << " (No = " << i << ")" << endl;
+        PrintStackMachineOperations(userDefined.GetOperations());
+    }
+
+    auto& constants = module.GetConstTable();
+    if (!constants.empty())
+    {
+        cout << "Constants:";
+
+        for (size_t i = 0; i < constants.size(); i++)
+        {
+            cout << (i == 0 ? " " : ", ") << "[" << i << "] = " << constants[i];
+        }
+
+        cout << endl;
+    }
+
+    cout << "}" << endl << endl;
+}
+
+void PrintStackMachineOperations(const std::vector<StackMachineOperation>& operations)
+{
+    static constexpr int AddressWidth = 6;
+    static constexpr int OpcodeWidth = 25;
+
+    for (size_t i = 0; i < operations.size(); i++)
+    {
+        std::cout << std::right << std::setw(AddressWidth) << i << ": ";
+        std::cout << std::left << std::setw(OpcodeWidth) << ToString(operations[i].opcode);
+        std::cout << " [Value = " << operations[i].value << "]" << std::endl;
     }
 }
 

@@ -100,14 +100,6 @@ TNumber EvaluateByJIT(const CompilationContext& context,
     /* ***** Generate LLVM-IR ***** */
     GenerateIR<TNumber>(context, state, op, &Context, M);
 
-    if (printInfo)
-    {
-        // PrintIR
-        outs() << "LLVM IR (Before optimized):\n---------------------------\n"
-               << *M << "---------------------------\n\n";
-        outs().flush();
-    }
-
     /* ***** Optimize ***** */
     if (optimize)
     {
@@ -132,14 +124,12 @@ TNumber EvaluateByJIT(const CompilationContext& context,
         }
 
         PM.run(*M);
+    }
 
-        if (printInfo)
-        {
-            // PrintIR
-            outs() << "LLVM IR (After optimized):\n---------------------------\n"
-                   << *M << "---------------------------\n\n";
-            outs().flush();
-        }
+    if (printInfo)
+    {
+        // PrintIR
+        outs() << "/*\n * LLVM IR\n */\n===============\n" << *M << "===============\n\n";
     }
 
     /* ***** Execute JIT compiled code ***** */
