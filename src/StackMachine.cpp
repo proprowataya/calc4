@@ -488,7 +488,24 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
                 operands[i]->Accept(*this);
             }
 
-            AddOperation(StackMachineOpcode::Call, operatorLabels[op->GetDefinition()]);
+            if (IsReplaceableWithJump(op))
+            {
+                for (int i = static_cast<int>(operands.size()) - 1; i >= 0; i--)
+                {
+                    AddOperation(StackMachineOpcode::StoreArg,
+                                 GetArgumentAddress(definition.value().GetNumOperands(), i));
+                }
+
+                AddOperation(StackMachineOpcode::Goto, OperatorBeginLabel);
+
+                // If we eliminate tail-call, there are no values left in the stack.
+                // We treat as if there are one returning value in the stack.
+                AddStackSize(1);
+            }
+            else
+            {
+                AddOperation(StackMachineOpcode::Call, operatorLabels[op->GetDefinition()]);
+            }
         }
 
         void AddStackSize(int value)
@@ -575,6 +592,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
                 variableIndices[variableName] = index;
                 return index;
             }
+        }
+
+        bool IsReplaceableWithJump(const std::shared_ptr<const UserDefinedOperator>& op) const
+        {
+            return definition == op->GetDefinition() && op->IsTailCall().value_or(false);
         }
 
         static int GetArgumentAddress(int numOperands, int index)

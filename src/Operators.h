@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -683,10 +684,12 @@ class UserDefinedOperator : public Operator,
 private:
     OperatorDefinition definition;
     std::vector<std::shared_ptr<const Operator>> operands;
+    std::optional<bool> isTailCall;
 
     UserDefinedOperator(const OperatorDefinition& definition,
-                        const std::vector<std::shared_ptr<const Operator>>& operands)
-        : definition(definition), operands(operands)
+                        const std::vector<std::shared_ptr<const Operator>>& operands,
+                        std::optional<bool> isTailCall = std::nullopt)
+        : definition(definition), operands(operands), isTailCall(isTailCall)
     {
     }
 
@@ -695,14 +698,20 @@ private:
 public:
     static std::shared_ptr<const UserDefinedOperator> Create(
         const OperatorDefinition& definition,
-        const std::vector<std::shared_ptr<const Operator>>& operands)
+        const std::vector<std::shared_ptr<const Operator>>& operands,
+        std::optional<bool> isTailCall = std::nullopt)
     {
-        return AllocateHelper<UserDefinedOperator>::Allocate(definition, operands);
+        return AllocateHelper<UserDefinedOperator>::Allocate(definition, operands, isTailCall);
     }
 
     const OperatorDefinition& GetDefinition() const
     {
         return definition;
+    }
+
+    std::optional<bool> IsTailCall() const
+    {
+        return isTailCall;
     }
 
     // TODO:
@@ -715,7 +724,9 @@ public:
     {
         std::ostringstream oss;
         oss << "UserDefinedOperator [Name = " << definition.GetName()
-            << ", NumOperands = " << definition.GetNumOperands() << "]";
+            << ", NumOperands = " << definition.GetNumOperands()
+            << ", IsTailCall = " << (isTailCall ? (*isTailCall ? "True" : "False") : "Unknown")
+            << "]";
         return oss.str();
     }
 
