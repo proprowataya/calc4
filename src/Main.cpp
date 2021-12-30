@@ -439,6 +439,7 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
         }
         case ExecutionType::Interpreter:
             result = Evaluate<TNumber>(context, state, op);
+            break;
         default:
             result = 0; // Suppress compiler warning
             UNREACHABLE();
