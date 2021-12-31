@@ -32,44 +32,61 @@ constexpr const char* Indent = "    ";
 constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
 #endif // ENABLE_GMP
 
-enum class ExecutionType
+enum class ExecutorType
 {
 #ifdef ENABLE_JIT
     JIT,
 #endif // ENABLE_JIT
     StackMachine,
-    Interpreter,
+    TreeTraversal,
+};
+
+enum class TreeTraversalExecutorMode
+{
+    Never,
+    WhenNoRecursiveOperators,
+    Always,
 };
 
 struct Option
 {
     int integerSize = 64;
 
-    ExecutionType executionType =
+    ExecutorType executorType =
 #ifdef ENABLE_JIT
-        ExecutionType::JIT;
+        ExecutorType::JIT;
 #else
-        ExecutionType::StackMachine;
+        ExecutorType::StackMachine;
 #endif // ENABLE_JIT
 
-    bool alwaysJit = false;
+    TreeTraversalExecutorMode treeExecutorMode =
+        TreeTraversalExecutorMode::WhenNoRecursiveOperators;
     bool optimize = true;
-    bool printInfo = false;
+    bool dumpProgram = false;
 };
 
 namespace CommandLineArgs
 {
 constexpr std::string_view Help = "--help";
-constexpr std::string_view PerformTest = "--test";
-constexpr std::string_view EnableJit = "--jit-on";
-constexpr std::string_view DisableJit = "--jit-off";
-constexpr std::string_view AlwaysJit = "--always-jit";
-constexpr std::string_view AlwaysJitShort = "-a";
+constexpr std::string_view EnableJit = "--enable-jit";
+constexpr std::string_view DisableJit = "--disable-jit";
+constexpr std::string_view NoUseTreeTraversalEvaluator = "--no-tree";
+constexpr std::string_view ForceTreeTraversalEvaluator = "--force-tree";
 constexpr std::string_view IntegerSize = "--size";
 constexpr std::string_view IntegerSizeShort = "-s";
-constexpr std::string_view EnableOptimization = "-O";
-constexpr std::string_view DisableOptimization = "-Od";
+constexpr std::string_view EnableOptimization = "-O1";
+constexpr std::string_view DisableOptimization = "-O0";
 constexpr std::string_view InfinitePrecisionInteger = "inf";
+constexpr std::string_view DumpProgram = "--dump";
+constexpr std::string_view PerformTest = "--test";
+}
+
+namespace ReplCommands
+{
+constexpr std::string_view DumpOn = "#dump on";
+constexpr std::string_view DumpOff = "#dump off";
+constexpr std::string_view OptimizeOn = "#optimize on";
+constexpr std::string_view OptimizeOff = "#optimize off";
 }
 
 std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc, char** argv);
@@ -101,7 +118,7 @@ bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const Compilati
 bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
                               const CompilationContext& context,
                               std::unordered_map<const OperatorDefinition*, int>& called);
-const char* GetExecutionTypeString(ExecutionType type);
+const char* GetExecutorTypeString(ExecutorType type);
 
 int main(int argc, char** argv)
 {
@@ -116,7 +133,7 @@ int main(int argc, char** argv)
 
 #ifdef ENABLE_JIT
     /* ***** Initialize LLVM if needed ***** */
-    if (performTest || option.executionType == ExecutionType::JIT)
+    if (performTest || option.executorType == ExecutorType::JIT)
     {
         LLVMInitializeNativeTarget();
         LLVMInitializeNativeAsmPrinter();
@@ -193,25 +210,25 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
                 PrintHelp(argc, argv);
                 exit(0);
             }
-            else if (str == CommandLineArgs::PerformTest)
-            {
-                performTest = true;
-            }
             else if (str == CommandLineArgs::EnableJit)
             {
 #ifdef ENABLE_JIT
-                option.executionType = ExecutionType::JIT;
+                option.executorType = ExecutorType::JIT;
 #else
                 throw std::string("Jit compilation is not supported");
 #endif // ENABLE_JIT
             }
             else if (str == CommandLineArgs::DisableJit)
             {
-                option.executionType = ExecutionType::StackMachine;
+                option.executorType = ExecutorType::StackMachine;
             }
-            else if (str == CommandLineArgs::AlwaysJit || str == CommandLineArgs::AlwaysJitShort)
+            else if (str == CommandLineArgs::NoUseTreeTraversalEvaluator)
             {
-                option.alwaysJit = true;
+                option.treeExecutorMode = TreeTraversalExecutorMode::Never;
+            }
+            else if (str == CommandLineArgs::ForceTreeTraversalEvaluator)
+            {
+                option.treeExecutorMode = TreeTraversalExecutorMode::Always;
             }
             else if (str == CommandLineArgs::IntegerSize ||
                      str == CommandLineArgs::IntegerSizeShort)
@@ -247,6 +264,14 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             {
                 option.optimize = false;
             }
+            else if (str == CommandLineArgs::DumpProgram)
+            {
+                option.dumpProgram = true;
+            }
+            else if (str == CommandLineArgs::PerformTest)
+            {
+                performTest = true;
+            }
             else
             {
                 sources.push_back(str);
@@ -258,6 +283,22 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             PrintHelp(argc, argv);
             exit(EXIT_FAILURE);
         }
+    }
+
+#if defined(ENABLE_JIT) && defined(ENABLE_GMP)
+    if (option.executorType == ExecutorType::JIT &&
+        option.integerSize == InfinitePrecisionIntegerSize)
+    {
+        option.executorType = ExecutorType::StackMachine;
+        std::cout << "Warning: Jit compilation is disabled because it does not support infinite "
+                     "precision integers."
+                  << std::endl;
+    }
+#endif // defined(ENABLE_JIT) && defined(ENABLE_GMP)
+
+    if (option.treeExecutorMode == TreeTraversalExecutorMode::Always)
+    {
+        option.executorType = ExecutorType::TreeTraversal;
     }
 
     return std::make_tuple(option, sources, performTest);
@@ -309,8 +350,7 @@ void RunAsRepl(Option& option)
 
     /* ***** Print current setting ***** */
     cout << "    Integer size: " << GetIntegerSizeDescription(option.integerSize) << endl
-         << "    Executor: " << GetExecutionTypeString(option.executionType) << endl
-         << "    Always JIT: " << (option.alwaysJit ? "on" : "off") << endl
+         << "    Executor: " << GetExecutorTypeString(option.executorType) << endl
          << "    Optimize: " << (option.optimize ? "on" : "off") << endl
          << endl;
 
@@ -327,25 +367,25 @@ void RunAsRepl(Option& option)
             break;
         }
 
-        if (line == "#print on")
+        if (line == ReplCommands::DumpOn)
         {
-            option.printInfo = true;
+            option.dumpProgram = true;
             cout << endl;
             continue;
         }
-        else if (line == "#print off")
+        else if (line == ReplCommands::DumpOff)
         {
-            option.printInfo = false;
+            option.dumpProgram = false;
             cout << endl;
             continue;
         }
-        else if (line == "#optimize on")
+        else if (line == ReplCommands::OptimizeOn)
         {
             option.optimize = true;
             cout << endl;
             continue;
         }
-        else if (line == "#optimize off")
+        else if (line == ReplCommands::OptimizeOff)
         {
             option.optimize = false;
             cout << endl;
@@ -377,59 +417,47 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
             op = Optimize<TNumber>(context, op);
         }
 
-        bool hasRecursiveCall = HasRecursiveCall(op, context);
-
-        if (option.printInfo)
+        if (option.dumpProgram)
         {
-            cout << "Has recursive call: " << (hasRecursiveCall ? "True" : "False") << endl << endl;
+            cout << "Has recursive call: " << (HasRecursiveCall(op, context) ? "True" : "False")
+                 << endl
+                 << endl;
             PrintTree(context, op);
         }
 
-        ExecutionType actualExecutionEngine = option.executionType;
-#ifdef ENABLE_JIT
-        if (actualExecutionEngine == ExecutionType::JIT && !option.alwaysJit &&
+        ExecutorType actualExecutionEngine = option.executorType;
+        if (option.executorType != ExecutorType::TreeTraversal &&
+            option.treeExecutorMode != TreeTraversalExecutorMode::Never &&
             !HasRecursiveCall(op, context))
         {
-            // There is no need to use Jit compilation for simple program.
-            // So we use StackMachine execution instead.
-            actualExecutionEngine = ExecutionType::StackMachine;
+            // The given program has no heavy loops, so we use tree traversal executor.
+            actualExecutionEngine = ExecutorType::TreeTraversal;
         }
-#ifdef ENABLE_GMP
-        if constexpr (std::is_same_v<TNumber, mpz_class>)
-        {
-            if (actualExecutionEngine == ExecutionType::JIT)
-            {
-                // Jit compiler does not support GMP
-                actualExecutionEngine = ExecutionType::StackMachine;
-            }
-        }
-#endif // ENABLE_GMP
-#endif // ENABLE_JIT
 
         TNumber result;
         switch (actualExecutionEngine)
         {
 #ifdef ENABLE_JIT
-        case ExecutionType::JIT:
+        case ExecutorType::JIT:
 #ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
-                result = 0; // Suppress compiler warning
-                UNREACHABLE();
+                throw Exceptions::AssertionErrorException(
+                    std::nullopt, "Jit compiler does not support infinite precision integers.");
             }
             else
 #endif // ENABLE_GMP
             {
                 result =
-                    EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.printInfo);
+                    EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.dumpProgram);
             }
             break;
 #endif // ENABLE_JIT
-        case ExecutionType::StackMachine:
+        case ExecutorType::StackMachine:
         {
             auto module = GenerateStackMachineModule<TNumber>(op, context);
 
-            if (option.printInfo)
+            if (option.dumpProgram)
             {
                 PrintStackMachineModule(module);
             }
@@ -437,7 +465,7 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
             result = ExecuteStackMachineModule(module, state);
             break;
         }
-        case ExecutionType::Interpreter:
+        case ExecutorType::TreeTraversal:
             result = Evaluate<TNumber>(context, state, op);
             break;
         default:
@@ -540,13 +568,15 @@ void PrintHelp(int argc, char** argv)
 {
     using namespace std;
 
-    cout << ProgramName << std::endl
-         << std::endl
+    cout << ProgramName << endl
+         << endl
+         << argv[0] << " [options] [files]" << endl
+         << endl
          << "Options:" << endl
          << CommandLineArgs::IntegerSize << "|" << CommandLineArgs::IntegerSizeShort << " <size>"
          << endl
-         << Indent << "Specify size of integer" << endl
-         << Indent << "size: 32, 64"
+         << Indent << "Specify the size of integer" << endl
+         << Indent << "size: 32, 64 (default)"
 #ifdef ENABLE_INT128
          << ", 128"
 #endif // ENABLE_INT128
@@ -556,19 +586,33 @@ void PrintHelp(int argc, char** argv)
 #endif // ENABLE_GMP
          << endl
 #ifdef ENABLE_JIT
-         << CommandLineArgs::EnableJit << endl
-         << Indent << "Enable JIT compilation" << endl
          << CommandLineArgs::DisableJit << endl
          << Indent << "Disable JIT compilation" << endl
-         << CommandLineArgs::AlwaysJit << "|" << CommandLineArgs::AlwaysJitShort << endl
-         << Indent << "Force JIT compilation" << endl
+         << CommandLineArgs::EnableJit << endl
+         << Indent << "Enable JIT compilation (default)" << endl
 #endif // ENABLE_JIT
-         << CommandLineArgs::EnableOptimization << endl
-         << Indent << "Enable optimization" << endl
          << CommandLineArgs::DisableOptimization << endl
          << Indent << "Disable optimization" << endl
+         << CommandLineArgs::EnableOptimization << endl
+         << Indent << "Enable optimization (default)" << endl
+         << CommandLineArgs::NoUseTreeTraversalEvaluator << endl
+         << Indent << "Always use the JIT or stack machine executors" << endl
+         << Indent
+         << "(By default, the tree traversal executor will be used when the given code has no "
+            "recursive operators)"
+         << endl
+         << CommandLineArgs::ForceTreeTraversalEvaluator << endl
+         << Indent << "Always use the tree traversal executors (very slow)" << endl
+         << CommandLineArgs::DumpProgram << endl
+         << Indent << "Dump the given program's structures such as an abstract syntax tree" << endl
          << CommandLineArgs::PerformTest << endl
-         << Indent << "Perform test" << endl;
+         << Indent << "Perform test" << endl
+         << endl
+         << "During the Repl mode, the following commands are available:" << endl
+         << Indent << ReplCommands::DumpOff << endl
+         << Indent << ReplCommands::DumpOn << endl
+         << Indent << ReplCommands::OptimizeOff << endl
+         << Indent << ReplCommands::OptimizeOn << endl;
 }
 
 void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op)
@@ -722,18 +766,18 @@ bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
     return false;
 }
 
-const char* GetExecutionTypeString(ExecutionType type)
+const char* GetExecutorTypeString(ExecutorType type)
 {
     switch (type)
     {
 #ifdef ENABLE_JIT
-    case ExecutionType::JIT:
+    case ExecutorType::JIT:
         return "JIT";
 #endif // ENABLE_JIT
-    case ExecutionType::StackMachine:
+    case ExecutorType::StackMachine:
         return "StackMachine";
-    case ExecutionType::Interpreter:
-        return "Interpreter";
+    case ExecutorType::TreeTraversal:
+        return "TreeTraversal";
     default:
         return "<Unknown>";
     }

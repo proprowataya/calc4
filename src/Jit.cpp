@@ -40,7 +40,7 @@
         const CompilationContext& context,                                                         \
         ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
                        TPrinter>& state,                                                           \
-        const std::shared_ptr<const Operator>& op, bool optimize, bool printInfo)
+        const std::shared_ptr<const Operator>& op, bool optimize, bool dumpProgram)
 
 InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
@@ -87,7 +87,7 @@ void StoreArray(void* state, TNumber index, TNumber value);
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 TNumber EvaluateByJIT(const CompilationContext& context,
                       ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<const Operator>& op, bool optimize, bool printInfo)
+                      const std::shared_ptr<const Operator>& op, bool optimize, bool dumpProgram)
 {
     using namespace llvm;
     LLVMContext Context;
@@ -126,10 +126,11 @@ TNumber EvaluateByJIT(const CompilationContext& context,
         PM.run(*M);
     }
 
-    if (printInfo)
+    if (dumpProgram)
     {
         // PrintIR
         outs() << "/*\n * LLVM IR\n */\n===============\n" << *M << "===============\n\n";
+        outs().flush();
     }
 
     /* ***** Execute JIT compiled code ***** */
