@@ -147,6 +147,12 @@ std::vector<std::pair<std::string_view, CharPosition>> Split(StringReader& reade
 
         assert(reader.Peek() == separator);
         reader.Read();
+
+        if (reader.Eof())
+        {
+            result.emplace_back("", reader.GetCurrentPosition());
+            break;
+        }
     }
 
     return result;
