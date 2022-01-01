@@ -1,13 +1,13 @@
 ﻿#pragma once
 
 #include "Common.h"
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <stack>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 /* ********** */
@@ -107,7 +107,7 @@ public:
 class CompilationContext
 {
 private:
-    std::unordered_map<std::string, OperatorImplement> userDefinedOperators;
+    std::map<std::string, OperatorImplement> userDefinedOperators;
 
 public:
     void AddOperatorImplement(const OperatorImplement& implement)
