@@ -410,12 +410,18 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
     {
         auto start = chrono::high_resolution_clock::now();
 
-        auto tokens = Lex(source, context);
-        auto op = Parse(tokens, context);
+        // We make a copy of the given CompilationContext so that it will not be destroyed if some
+        // error occurs
+        auto copyOfContext = context;
+        auto tokens = Lex(source, copyOfContext);
+        auto op = Parse(tokens, copyOfContext);
         if (option.optimize)
         {
-            op = Optimize<TNumber>(context, op);
+            op = Optimize<TNumber>(copyOfContext, op);
         }
+
+        // All compilation is complete, so we can update the given CompilationContext
+        context = std::move(copyOfContext);
 
         if (option.dumpProgram)
         {
