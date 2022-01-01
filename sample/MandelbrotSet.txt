@@ -94,10 +94,10 @@ D[getCoordinate|index,min,max,canvasWidth|({index}{toFixed}){mult}({max}{sub}{mi
 
 // Core parts of the computation
 D[computePoint|loop,x,y,a,b,i,j|((x{mult}x){add}(y{mult}y)) > {Inf} ?
-                                (i{setPoint}j{setPoint}{loop}) ?
+                                (i{setPoint}j{setPoint}{loop}) ? (
                                 ({loop} >= {LoopLimit}) ?
                                 0 ?
-                                (({loop}+1){computePoint}(((x{mult}x){sub}(y{mult}y)){add}a){computePoint}((2{toFixed}{mult}x{mult}y){add}b){computePoint}a{computePoint}b{computePoint}i{computePoint}j)]
+                                (({loop}+1){computePoint}(((x{mult}x){sub}(y{mult}y)){add}a){computePoint}((2{toFixed}{mult}x{mult}y){add}b){computePoint}a{computePoint}b{computePoint}i{computePoint}j))]
 D[computeY|i,j,a|j < {CanvasWidthY} ?
                  ((i{setPoint}j{setPoint}{LoopLimit})(0{computePoint}0{computePoint}0{computePoint}a{computePoint}(j{getCoordinate}{MinY}{getCoordinate}{MaxY}{getCoordinate}{CanvasWidthY}){computePoint}i{computePoint}j)(i{computeY}(j+1){computeY}a)) ?
                  0]
