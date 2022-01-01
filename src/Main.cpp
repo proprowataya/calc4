@@ -101,7 +101,7 @@ template<typename TNumber>
 void RunAsRepl(Option& option);
 
 template<typename TNumber>
-void ExecuteCore(std::string_view source, std::string_view filePath, CompilationContext& context,
+void ExecuteCore(std::string_view source, const char* filePath, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option);
 
 inline const char* GetIntegerSizeDescription(int size);
@@ -392,12 +392,12 @@ void RunAsRepl(Option& option)
             continue;
         }
 
-        ExecuteCore<TNumber>(line, "repl-input", context, state, option);
+        ExecuteCore<TNumber>(line, nullptr, context, state, option);
     }
 }
 
 template<typename TNumber>
-void ExecuteCore(std::string_view source, std::string_view filePath, CompilationContext& context,
+void ExecuteCore(std::string_view source, const char* filePath, CompilationContext& context,
                  ExecutionState<TNumber>& state, const Option& option)
 {
     using namespace std;
@@ -489,15 +489,18 @@ void ExecuteCore(std::string_view source, std::string_view filePath, Compilation
     }
     catch (Exceptions::Calc4Exception& error)
     {
-        cout << filePath;
-
         auto& position = error.GetPosition();
         if (position)
         {
-            cout << ":" << (position->lineNo + 1) << ":" << (position->charNo + 1) << ":";
+            if (filePath != nullptr)
+            {
+                cout << filePath << ":";
+            }
+
+            cout << (position->lineNo + 1) << ":" << (position->charNo + 1) << ": ";
         }
 
-        cout << " Error: " << error.what() << endl;
+        cout << "Error: " << error.what() << endl;
 
         if (position)
         {
