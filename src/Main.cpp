@@ -87,6 +87,7 @@ constexpr std::string_view DumpOn = "#dump on";
 constexpr std::string_view DumpOff = "#dump off";
 constexpr std::string_view OptimizeOn = "#optimize on";
 constexpr std::string_view OptimizeOff = "#optimize off";
+constexpr std::string_view ResetContext = "#reset";
 }
 
 std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc, char** argv);
@@ -391,6 +392,13 @@ void RunAsRepl(Option& option)
             cout << endl;
             continue;
         }
+        else if (line == ReplCommands::ResetContext)
+        {
+            context = {};
+            state = {};
+            cout << endl;
+            continue;
+        }
 
         ExecuteCore<TNumber>(line, nullptr, context, state, option);
     }
@@ -621,7 +629,8 @@ void PrintHelp(int argc, char** argv)
          << Indent << ReplCommands::DumpOff << endl
          << Indent << ReplCommands::DumpOn << endl
          << Indent << ReplCommands::OptimizeOff << endl
-         << Indent << ReplCommands::OptimizeOn << endl;
+         << Indent << ReplCommands::OptimizeOn << endl
+         << Indent << ReplCommands::ResetContext << endl;
 }
 
 void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op)
