@@ -12,7 +12,7 @@ ifeq (${CONFIG}, DEBUG)
 	DEBUG_RELEASE_CXX_FLAGS = ${DEBUG_CXX_FLAGS}
 endif
 
-CXX_FLAGS = -Wall -fexceptions -Wno-unknown-warning-option \
+CXX_FLAGS = -Wall -fexceptions -Wno-unknown-warning-option -Wno-unused-command-line-argument\
 	-MMD -MP -std=c++17 -DENABLE_INT128 ${DEBUG_RELEASE_CXX_FLAGS}
 
 ifdef ENABLE_JIT
