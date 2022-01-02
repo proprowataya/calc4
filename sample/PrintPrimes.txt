@@ -22,4 +22,5 @@ D[printPrimes|i|i > {MaxN} ?
                 ((i{isPrime} ? ((i{print})(10P)) ? 0)
                  ((i + 1){printPrimes}))]
 
-2{printPrimes}
+(2{printPrimes})
+(10P)
