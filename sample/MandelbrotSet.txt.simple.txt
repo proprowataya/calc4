@@ -129,15 +129,8 @@ D[computeX|i|i < {CanvasWidthX} ?
 // Get the corresponding background color in the console
 D[getColor|v|(v < (256 - 232))?(255 - v)?232]
 
-// Print integer
-D[printIntImpl|n,divisor,printZero|({divisor} != 0) ?
-                                   ((((n / {divisor})S != 0) {or} {printZero} ? ((48 + L)P) ? 0)
-                                    ((n % {divisor}){printIntImpl}({divisor} / 10){printIntImpl}({printZero}{or}(L != 0)))) ?
-                                   0]
-D[print|n|n{printIntImpl}1000{printIntImpl}0]
-
-// Print the computed result using ANSI escape sequence
-D[printPoint|v|(27P91P52P56P59P53P59P)(v{getColor}{print})(109P32P27P91P48P109P)]
+// Print the computed result
+D[printPoint|v|(v != {LoopLimit} ? 64 ? 32)P]
 D[printX|i,j|i<{CanvasWidthX}?(((i{getIndex}j)@{printPoint})((i+1){printX}j))?(10P)]
 D[printY|j|j<{CanvasWidthY}?((0{printX}j)((j+1){printY}))?0]
 
