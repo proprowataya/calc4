@@ -1,3 +1,12 @@
+﻿/*****
+ *
+ * The Calc4 Programming Language
+ *
+ * Copyright (C) 2018-2022 Yuya Watari
+ * This software is released under the MIT License, see LICENSE file for details
+ *
+ *****/
+
 #ifndef ENABLE_JIT
 #error Jit compilation is not enabled. To use Jit feature, compile this file with defining "ENABLE_JIT"
 #endif // !ENABLE_JIT
