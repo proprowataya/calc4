@@ -22,8 +22,20 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
-/*****/
+namespace std
+{
+template<>
+struct hash<calc4::OperatorDefinition>
+{
+    size_t operator()(const calc4::OperatorDefinition& definition) const
+    {
+        return hash<std::string>{}(definition.GetName()) ^ hash<int>{}(definition.GetNumOperands());
+    }
+};
+}
 
+namespace calc4
+{
 #define InstantiateGenerateStackMachineModule(TNumber)                                             \
     template StackMachineModule<TNumber> GenerateStackMachineModule(                               \
         const std::shared_ptr<const Operator>& op, const CompilationContext& context)
@@ -65,18 +77,6 @@ InstantiateExecuteStackMachineModule(mpz_class, BufferedPrinter);
 #endif // ENABLE_GMP
 
 /*****/
-
-namespace std
-{
-template<>
-struct hash<OperatorDefinition>
-{
-    size_t operator()(const OperatorDefinition& definition) const
-    {
-        return hash<std::string>{}(definition.GetName()) ^ hash<int>{}(definition.GetNumOperands());
-    }
-};
-}
 
 template<typename TNumber>
 std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModule<
@@ -856,4 +856,5 @@ TNumber ExecuteStackMachineModule(
             break;
         }
     }
+}
 }

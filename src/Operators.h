@@ -19,8 +19,8 @@
 #include <string_view>
 #include <vector>
 
-/* ********** */
-
+namespace calc4
+{
 class Operator;
 class ZeroOperator;
 class PrecomputedOperator;
@@ -742,3 +742,4 @@ public:
     MAKE_ACCEPT;
     // MAKE_GET_OPERANDS()
 };
+}

@@ -26,6 +26,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+namespace calc4
+{
 namespace
 {
 enum class ExecutorType
@@ -272,5 +274,6 @@ void TestOne(TestCase test, TestResult& testResult)
             }
         }
     }
+}
 }
 }

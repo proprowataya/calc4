@@ -16,7 +16,7 @@
 #include <string>
 
 // Error messages
-namespace Exceptions
+namespace calc4::Exceptions
 {
 class Calc4Exception : std::exception
 {

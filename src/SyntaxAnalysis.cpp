@@ -19,6 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace calc4
+{
 namespace
 {
 std::shared_ptr<const Operator> ParseCore(const std::vector<std::shared_ptr<Token>>& tokens,
@@ -715,4 +717,5 @@ std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>&
 {
     GenerateUserDefinedCodes(tokens, context);
     return ParseCore(tokens, context);
+}
 }

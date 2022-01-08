@@ -9,19 +9,6 @@
 
 #include "Common.h"
 
-std::string_view TrimWhiteSpaces(std::string_view str)
-{
-    std::string::size_type left = str.find_first_not_of(' ');
-
-    if (left == std::string::npos)
-    {
-        return str;
-    }
-
-    std::string::size_type right = str.find_last_not_of(' ');
-    return str.substr(left, right - left + 1);
-}
-
 #ifdef ENABLE_INT128
 // https://stackoverflow.com/questions/25114597/how-to-print-int128-in-g
 std::ostream& operator<<(std::ostream& dest, __int128_t value)
@@ -57,3 +44,19 @@ std::ostream& operator<<(std::ostream& dest, __int128_t value)
     return dest;
 }
 #endif // ENABLE_INT128
+
+namespace calc4
+{
+std::string_view TrimWhiteSpaces(std::string_view str)
+{
+    std::string::size_type left = str.find_first_not_of(' ');
+
+    if (left == std::string::npos)
+    {
+        return str;
+    }
+
+    std::string::size_type right = str.find_last_not_of(' ');
+    return str.substr(left, right - left + 1);
+}
+}

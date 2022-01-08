@@ -42,6 +42,8 @@
 #include "Jit.h"
 #include "Operators.h"
 
+namespace calc4
+{
 /* Explicit instantiation of "EvaluateByJIT" Function */
 #define InstantiateEvaluateByJIT(TNumber, TPrinter)                                                \
     template TNumber EvaluateByJIT<TNumber, DefaultVariableSource<TNumber>,                        \
@@ -588,4 +590,5 @@ void StoreArray(void* state, TNumber index, TNumber value)
                ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
         ->GetArraySource()
         .Set(index, value);
+}
 }

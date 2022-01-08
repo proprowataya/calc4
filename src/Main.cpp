@@ -34,6 +34,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+using namespace calc4;
+
 constexpr const char* ProgramName = "Calc4 REPL";
 constexpr const char* Indent = "    ";
 

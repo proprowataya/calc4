@@ -16,6 +16,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+namespace calc4
+{
 #define STACK_ALLOC(TYPE, LENGTH) reinterpret_cast<TYPE*>(alloca(sizeof(TYPE) * (LENGTH)))
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
@@ -223,4 +225,5 @@ TNumber Evaluate(const CompilationContext& context,
     Evaluator evaluator(&context, &state);
     op->Accept(evaluator);
     return evaluator.value;
+}
 }

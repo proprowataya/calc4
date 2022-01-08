@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+namespace calc4
+{
 enum class StackMachineOpcode : int8_t
 {
     Push,
@@ -209,3 +211,4 @@ template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNum
 TNumber ExecuteStackMachineModule(
     const StackMachineModule<TNumber>& module,
     ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state);
+}

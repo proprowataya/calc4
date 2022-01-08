@@ -27,11 +27,13 @@
 #endif // _MSC_VER
 #endif // !NDEBUG
 
-std::string_view TrimWhiteSpaces(std::string_view str);
-
 #ifdef ENABLE_INT128
 std::ostream& operator<<(std::ostream& dest, __int128_t value);
 #endif // ENABLE_INT128
+
+namespace calc4
+{
+std::string_view TrimWhiteSpaces(std::string_view str);
 
 struct CharPosition
 {
@@ -90,3 +92,4 @@ public:
         return value->ToString();
     }
 };
+}

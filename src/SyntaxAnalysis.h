@@ -19,8 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
-/* ********** */
-
+namespace calc4
+{
 class Token;
 std::vector<std::shared_ptr<Token>> Lex(std::string_view text, CompilationContext& context);
 std::shared_ptr<const Operator> Parse(const std::vector<std::shared_ptr<Token>>& tokens,
@@ -398,3 +398,4 @@ public:
     MAKE_GET_SUPPLEMENTARY_TEXT;
     MAKE_GET_NUM_OPERANDS((definition.GetNumOperands()))
 };
+}

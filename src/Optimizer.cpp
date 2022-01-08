@@ -16,6 +16,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+namespace calc4
+{
 namespace
 {
 template<typename TNumber>
@@ -403,3 +405,4 @@ template std::shared_ptr<const Operator> Optimize<__int128_t>(
 template std::shared_ptr<const Operator> Optimize<mpz_class>(
     CompilationContext& context, const std::shared_ptr<const Operator>& op);
 #endif // ENABLE_GMP
+}

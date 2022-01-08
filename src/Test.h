@@ -9,4 +9,7 @@
 
 #pragma once
 
+namespace calc4
+{
 void TestAll();
+}

@@ -19,6 +19,8 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+namespace calc4
+{
 template<typename TNumber>
 class DefaultVariableSource;
 
@@ -218,3 +220,4 @@ private:
         }
     }
 };
+}
