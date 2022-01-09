@@ -89,25 +89,42 @@ Another sample code is also available.
 ### Requirements
 
 * C++ compiler supporting C++17
-* (make)
+* [CMake](https://cmake.org/) (>= 3.8)
 * (git)
 
-### Build and Run
+### Building Calc4
 
-* Unix-like systems
-    ```
-    git clone https://github.com/proprowataya/calc4.git
-    cd calc4/src
-    make
-    ./calc4 ../sample/MandelbrotSet.txt
-    ```
-* Windows (Type these commands on "Visual Studio Developer Command Prompt")
-    ```
-    git clone https://github.com/proprowataya/calc4.git
-    cd calc4\src
-    build.bat
-    .\calc4.exe ..\sample\MandelbrotSet.txt
-    ```
+1. Install CMake
+    * dnf
+        ```
+        sudo dnf install cmake -y
+        ```
+    * apt
+        ```
+        sudo apt update
+        sudo apt install cmake -y
+        ```
+    * Binary
+        * https://cmake.org/
+1. Build and run
+    * Unix-like systems
+        ```
+        git clone https://github.com/proprowataya/calc4.git
+        mkdir calc4-build
+        cd calc4-build
+        cmake ../calc4/src
+        cmake --build .
+        ./calc4 ../calc4/sample/MandelbrotSet.txt
+        ```
+    * Windows
+        ```
+        git clone https://github.com/proprowataya/calc4.git
+        mkdir calc4-build
+        cd calc4-build
+        cmake ..\calc4\src
+        cmake --build . --config Release
+        .\Release\calc4.exe ..\calc4\sample\MandelbrotSet.txt
+        ```
 
 If nothing is specified as a command-line argument, Calc4 works as REPL. Please input what you want to evaluate.
 
@@ -130,28 +147,36 @@ Elapsed: 1457.58 ms
 >
 ```
 
-### JIT Compilation
+### JIT Compilation (Optional)
 
-You can use the JIT compiler using LLVM. The steps to enable JIT compilation are as follows. Currently, the Windows system is not supported.
+You can use the JIT compiler supported by LLVM. The steps to enable JIT compilation are as follows.
 
-1. Install [clang](https://clang.llvm.org/) and [LLVM](https://llvm.org/)
+1. Install [LLVM](https://llvm.org/) (>= 5.0)
     * apt
         ```
         sudo apt update
-        sudo apt install clang llvm-dev -y
+        sudo apt install llvm-dev -y
         ```
     * dnf
         ```
-        sudo dnf install clang llvm-devel -y
+        sudo dnf install llvm-devel -y
         ```
-1. Clean
-    ```
-    make clean
-    ```
+    * Windows
+        * You need to build the LLVM from the source code. Please follow [the official instructions](https://llvm.org/docs/GettingStartedVS.html).
+        * Make sure that ```llvm-config.exe``` is added to the PATH.
 1. Build again with an option
-    ```
-    make ENABLE_JIT=1
-    ```
+    * Unix-like systems
+        ```
+        cmake ../calc4/src -DENABLE_JIT=ON
+        cmake --build .
+        ./calc4
+        ```
+    * Windows
+        ```
+        cmake ..\calc4\src -DENABLE_JIT=ON
+        cmake --build . --config Release
+        .\Release\calc4.exe
+        ```
 
 ## Sample Codes
 
