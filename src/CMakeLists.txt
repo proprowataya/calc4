@@ -25,6 +25,8 @@ if (ENABLE_JIT)
     execute_process(COMMAND ${LLVM_CONFIG} --cxxflags OUTPUT_VARIABLE LLVM_CXXFLAGS)
     # Remove unnecessary language version specification
     string(REGEX REPLACE "[-/]std[=:][^ ]*" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
+    string(REGEX REPLACE "/EHs-c-" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
+    string(REGEX REPLACE "/GR-" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
     # Remove new-lines
     string(REGEX REPLACE "[\r\n]+" " " LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
     # Split arguments
@@ -37,7 +39,7 @@ if (ENABLE_JIT)
     target_link_libraries(calc4 PUBLIC ${LLVM_LDFLAGS})
 
     if (MSVC)
-        target_compile_options(calc4 PUBLIC "/EHs-c" "/GR" "/sdl-" "/MP")
+        target_compile_options(calc4 PUBLIC "/sdl-" "/MP")
     else()
         target_compile_options(calc4 PUBLIC "-fexceptions" "-Wno-unknown-warning-option" "-Wno-unused-command-line-argument")
     endif()
