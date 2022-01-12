@@ -123,6 +123,12 @@ void TestAll()
     using namespace std;
     TestResult result;
 
+#ifdef NO_USE_COMPUTED_GOTO
+    std::cout << "NO_USE_COMPUTED_GOTO is defined." << std::endl;
+#else
+    std::cout << "NO_USE_COMPUTED_GOTO is not defined." << std::endl;
+#endif // NO_USE_COMPUTED_GOTO
+
     for (size_t i = 0; i < NumTestCases; i++)
     {
         auto test = TestCases[i];

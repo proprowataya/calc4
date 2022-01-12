@@ -17,6 +17,11 @@ if (NOT DEFINED LLVM_CONFIG)
     set(LLVM_CONFIG "llvm-config" CACHE STRING "Path to llvm-config")
 endif()
 
+option(NO_USE_COMPUTED_GOTO "Disable the computed goto technique on the stack machine" OFF)
+if (NO_USE_COMPUTED_GOTO)
+    target_compile_definitions(calc4 PUBLIC NO_USE_COMPUTED_GOTO)
+endif()
+
 option(ENABLE_JIT "Enable the JIT compilation with LLVM" OFF)
 if (ENABLE_JIT)
     target_sources(calc4 PRIVATE Jit.cpp Jit.h)
