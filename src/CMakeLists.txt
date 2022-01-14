@@ -32,8 +32,14 @@ if (ENABLE_JIT)
     string(REGEX REPLACE "[-/]std[=:][^ ]*" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
     string(REGEX REPLACE "/EHs-c-" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
     string(REGEX REPLACE "/GR-" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
+    if (NOT NO_USE_COMPUTED_GOTO)
+        # Computed goto is a GCC extension. We do not want compiler to warn it.
+        string(REGEX REPLACE "-pedantic" "" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
+    endif()
+
     # Remove new-lines
     string(REGEX REPLACE "[\r\n]+" " " LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
+
     # Split arguments
     string(REGEX REPLACE "[ ]+" ";" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
     target_compile_options(calc4 PUBLIC ${LLVM_CXXFLAGS})
