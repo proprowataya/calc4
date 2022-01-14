@@ -49,6 +49,20 @@ public:
     }
 };
 
+struct StreamPrinter
+{
+private:
+    std::ostream* stream;
+
+public:
+    StreamPrinter(std::ostream* stream) : stream(stream) {}
+
+    void operator()(char c) const
+    {
+        *stream << c;
+    }
+};
+
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
          typename TPrinter = DefaultPrinter>
