@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 project(calc4 CXX)
-add_executable(calc4 Common.cpp Main.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Test.cpp Common.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h StackMachine.h SyntaxAnalysis.h Test.h)
+add_executable(calc4 Common.cpp Main.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Test.cpp Common.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h ReplCommon.h StackMachine.h SyntaxAnalysis.h Test.h)
 target_compile_features(calc4 PUBLIC cxx_std_17)
 
 if (NOT CMAKE_BUILD_TYPE)

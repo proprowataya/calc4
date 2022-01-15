@@ -57,9 +57,12 @@ InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int32_t, BufferedPrinter);
 InstantiateEvaluateByJIT(int64_t, BufferedPrinter);
+InstantiateEvaluateByJIT(int32_t, StreamPrinter);
+InstantiateEvaluateByJIT(int64_t, StreamPrinter);
 #ifdef ENABLE_INT128
 InstantiateEvaluateByJIT(__int128_t, DefaultPrinter);
 InstantiateEvaluateByJIT(__int128_t, BufferedPrinter);
+InstantiateEvaluateByJIT(__int128_t, StreamPrinter);
 #endif // ENABLE_INT128
 
 namespace

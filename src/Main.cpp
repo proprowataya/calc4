@@ -11,6 +11,7 @@
 #include "Exceptions.h"
 #include "Operators.h"
 #include "Optimizer.h"
+#include "ReplCommon.h"
 #include "StackMachine.h"
 #include "SyntaxAnalysis.h"
 #include "Test.h"
@@ -37,44 +38,6 @@
 using namespace calc4;
 
 constexpr const char* ProgramName = "Calc4 REPL";
-constexpr const char* Indent = "    ";
-
-#ifdef ENABLE_GMP
-constexpr const int InfinitePrecisionIntegerSize = std::numeric_limits<int>::max();
-#endif // ENABLE_GMP
-
-enum class ExecutorType
-{
-#ifdef ENABLE_JIT
-    JIT,
-#endif // ENABLE_JIT
-    StackMachine,
-    TreeTraversal,
-};
-
-enum class TreeTraversalExecutorMode
-{
-    Never,
-    WhenNoRecursiveOperators,
-    Always,
-};
-
-struct Option
-{
-    int integerSize = 64;
-
-    ExecutorType executorType =
-#ifdef ENABLE_JIT
-        ExecutorType::JIT;
-#else
-        ExecutorType::StackMachine;
-#endif // ENABLE_JIT
-
-    TreeTraversalExecutorMode treeExecutorMode =
-        TreeTraversalExecutorMode::WhenNoRecursiveOperators;
-    bool optimize = true;
-    bool dumpProgram = false;
-};
 
 namespace CommandLineArgs
 {
@@ -112,24 +75,9 @@ void RunSources(const Option& option, const std::vector<const char*>& sources);
 template<typename TNumber>
 void RunAsRepl(Option& option);
 
-template<typename TNumber>
-void ExecuteCore(std::string_view source, const char* filePath, CompilationContext& context,
-                 ExecutionState<TNumber>& state, const Option& option);
-
 inline const char* GetIntegerSizeDescription(int size);
 inline bool IsSupportedIntegerSize(int size);
 void PrintHelp(int argc, char** argv);
-void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op);
-void PrintTreeCore(const std::shared_ptr<const Operator>& op, int depth);
-
-template<typename TNumber>
-void PrintStackMachineModule(const StackMachineModule<TNumber>& module);
-
-void PrintStackMachineOperations(const std::vector<StackMachineOperation>& operations);
-bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context);
-bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
-                              const CompilationContext& context,
-                              std::unordered_map<const OperatorDefinition*, int>& called);
 const char* GetExecutorTypeString(ExecutorType type);
 
 int main(int argc, char** argv)
@@ -348,7 +296,7 @@ void RunSources(const Option& option, const std::vector<const char*>& sources)
 
         CompilationContext context;
         ExecutionState<TNumber> state;
-        ExecuteCore(source, path, context, state, option);
+        ExecuteSource(source, path, context, state, option, std::cout);
     }
 }
 
@@ -411,139 +359,8 @@ void RunAsRepl(Option& option)
             continue;
         }
 
-        ExecuteCore<TNumber>(line, nullptr, context, state, option);
-    }
-}
-
-template<typename TNumber>
-void ExecuteCore(std::string_view source, const char* filePath, CompilationContext& context,
-                 ExecutionState<TNumber>& state, const Option& option)
-{
-    using namespace std;
-
-#ifdef ENABLE_JIT
-    using namespace llvm;
-#endif // ENABLE_JIT
-
-    try
-    {
-        auto start = chrono::high_resolution_clock::now();
-
-        // We make a copy of the given CompilationContext so that it will not be destroyed if some
-        // error occurs
-        auto copyOfContext = context;
-        auto tokens = Lex(source, copyOfContext);
-        auto op = Parse(tokens, copyOfContext);
-        if (option.optimize)
-        {
-            op = Optimize<TNumber>(copyOfContext, op);
-        }
-
-        // All compilation is complete, so we can update the given CompilationContext
-        context = std::move(copyOfContext);
-
-        if (option.dumpProgram)
-        {
-            cout << "Has recursive call: " << (HasRecursiveCall(op, context) ? "True" : "False")
-                 << endl
-                 << endl;
-            PrintTree(context, op);
-        }
-
-        ExecutorType actualExecutionEngine = option.executorType;
-        if (option.executorType != ExecutorType::TreeTraversal &&
-            option.treeExecutorMode != TreeTraversalExecutorMode::Never &&
-            !HasRecursiveCall(op, context))
-        {
-            // The given program has no heavy loops, so we use tree traversal executor.
-            actualExecutionEngine = ExecutorType::TreeTraversal;
-        }
-
-        TNumber result;
-        switch (actualExecutionEngine)
-        {
-#ifdef ENABLE_JIT
-        case ExecutorType::JIT:
-#ifdef ENABLE_GMP
-            if constexpr (std::is_same_v<TNumber, mpz_class>)
-            {
-                throw Exceptions::AssertionErrorException(
-                    std::nullopt, "Jit compiler does not support infinite precision integers.");
-            }
-            else
-#endif // ENABLE_GMP
-            {
-                result =
-                    EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.dumpProgram);
-            }
-            break;
-#endif // ENABLE_JIT
-        case ExecutorType::StackMachine:
-        {
-            auto module = GenerateStackMachineModule<TNumber>(op, context);
-
-            if (option.dumpProgram)
-            {
-                PrintStackMachineModule(module);
-            }
-
-            result = ExecuteStackMachineModule(module, state);
-            break;
-        }
-        case ExecutorType::TreeTraversal:
-            result = Evaluate<TNumber>(context, state, op);
-            break;
-        default:
-            result = 0; // Suppress compiler warning
-            UNREACHABLE();
-            break;
-        }
-
-        auto end = chrono::high_resolution_clock::now();
-
-        cout << result << endl
-             << "Elapsed: " << (chrono::duration<double>(end - start).count() * 1000) << " ms"
-             << endl
-             << endl;
-    }
-    catch (Exceptions::Calc4Exception& error)
-    {
-        auto& position = error.GetPosition();
-        if (position)
-        {
-            if (filePath != nullptr)
-            {
-                cout << filePath << ":";
-            }
-
-            cout << (position->lineNo + 1) << ":" << (position->charNo + 1) << ": ";
-        }
-
-        cout << "Error: " << error.what() << endl;
-
-        if (position)
-        {
-            size_t lineStartIndex = source.substr(0, position->index).find_last_of("\r\n");
-            lineStartIndex = lineStartIndex == source.npos ? 0 : (lineStartIndex + 1);
-
-            size_t lineEndIndex = source.find_first_of("\r\n", position->index);
-            lineEndIndex = lineEndIndex == source.npos ? source.length() : lineEndIndex;
-
-            std::string_view line = source.substr(lineStartIndex, lineEndIndex - lineStartIndex);
-
-            static constexpr int LineNoWidth = 8;
-            static constexpr std::string_view Splitter = " | ";
-            cout << std::right << std::setw(LineNoWidth) << (position->lineNo + 1) << Splitter
-                 << line << endl;
-            for (int i = 0;
-                 i < LineNoWidth + static_cast<int>(Splitter.length()) + position->charNo; i++)
-            {
-                cout << ' ';
-            }
-            cout << '^' << endl;
-        }
-
-        cout << endl;
+        ExecuteSource<TNumber>(line, nullptr, context, state, option, std::cout);
+        std::cout << std::endl;
     }
 }
 
@@ -642,157 +459,6 @@ void PrintHelp(int argc, char** argv)
          << Indent << ReplCommands::OptimizeOff << endl
          << Indent << ReplCommands::OptimizeOn << endl
          << Indent << ReplCommands::ResetContext << endl;
-}
-
-void PrintTree(const CompilationContext& context, const std::shared_ptr<const Operator>& op)
-{
-    using std::cout;
-    using std::endl;
-
-    cout << "/*" << endl << " * Tree" << endl << " */" << endl << "{" << endl << "Main:" << endl;
-    PrintTreeCore(op, 1);
-
-    for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
-    {
-        auto& name = it->second.GetDefinition().GetName();
-        auto& op = it->second.GetOperator();
-
-        cout << endl << "Operator \"" << name << "\":" << endl;
-        PrintTreeCore(op, 1);
-    }
-
-    cout << "}" << endl << endl;
-}
-
-void PrintTreeCore(const std::shared_ptr<const Operator>& op, int depth)
-{
-    using namespace std;
-
-    auto PrintIndent = [depth]() {
-        for (int i = 0; i < depth; i++)
-        {
-            cout << Indent;
-        }
-    };
-
-    PrintIndent();
-
-    cout << op->ToString() << endl;
-    for (auto& operand : op->GetOperands())
-    {
-        PrintTreeCore(operand, depth + 1);
-    }
-
-    if (auto parenthesis = std::dynamic_pointer_cast<const ParenthesisOperator>(op))
-    {
-        PrintIndent();
-        cout << "Contains:" << endl;
-        for (auto& op2 : parenthesis->GetOperators())
-        {
-            PrintTreeCore(op2, depth + 1);
-        }
-    }
-}
-
-template<typename TNumber>
-void PrintStackMachineModule(const StackMachineModule<TNumber>& module)
-{
-    using std::cout;
-    using std::endl;
-
-    cout << "/*" << endl << " * Stack Machine Codes" << endl << " */" << endl << "{" << endl;
-
-    cout << "Main:" << endl;
-    PrintStackMachineOperations(module.GetEntryPoint());
-
-    auto& userDefinedOperators = module.GetUserDefinedOperators();
-    for (size_t i = 0; i < userDefinedOperators.size(); i++)
-    {
-        auto& userDefined = userDefinedOperators[i];
-        cout << "Operator \"" << userDefined.GetDefinition().GetName() << "\""
-             << " (No = " << i << ")" << endl;
-        PrintStackMachineOperations(userDefined.GetOperations());
-    }
-
-    auto& constants = module.GetConstTable();
-    if (!constants.empty())
-    {
-        cout << "Constants:";
-
-        for (size_t i = 0; i < constants.size(); i++)
-        {
-            cout << (i == 0 ? " " : ", ") << "[" << i << "] = " << constants[i];
-        }
-
-        cout << endl;
-    }
-
-    cout << "}" << endl << endl;
-}
-
-void PrintStackMachineOperations(const std::vector<StackMachineOperation>& operations)
-{
-    static constexpr int AddressWidth = 6;
-    static constexpr int OpcodeWidth = 25;
-
-    for (size_t i = 0; i < operations.size(); i++)
-    {
-        std::cout << std::right << std::setw(AddressWidth) << i << ": ";
-        std::cout << std::left << std::setw(OpcodeWidth) << ToString(operations[i].opcode);
-        std::cout << " [Value = " << operations[i].value << "]" << std::endl;
-    }
-}
-
-bool HasRecursiveCall(const std::shared_ptr<const Operator>& op, const CompilationContext& context)
-{
-    std::unordered_map<const OperatorDefinition*, int> called;
-    return HasRecursiveCallInternal(op, context, called);
-}
-
-bool HasRecursiveCallInternal(const std::shared_ptr<const Operator>& op,
-                              const CompilationContext& context,
-                              std::unordered_map<const OperatorDefinition*, int>& called)
-{
-    if (auto userDefined = std::dynamic_pointer_cast<const UserDefinedOperator>(op))
-    {
-        auto& definition = userDefined->GetDefinition();
-        if (++called[&definition] > 1)
-        {
-            // Recursive call detected
-            return true;
-        }
-
-        if (HasRecursiveCallInternal(
-                context.GetOperatorImplement(definition.GetName()).GetOperator(), context, called))
-        {
-            --called[&definition];
-            return true;
-        }
-        else
-        {
-            --called[&definition];
-        }
-    }
-    else if (auto parenthesis = std::dynamic_pointer_cast<const ParenthesisOperator>(op))
-    {
-        for (auto& op2 : parenthesis->GetOperators())
-        {
-            if (HasRecursiveCallInternal(op2, context, called))
-            {
-                return true;
-            }
-        }
-    }
-
-    for (auto& operand : op->GetOperands())
-    {
-        if (HasRecursiveCallInternal(operand, context, called))
-        {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 const char* GetExecutorTypeString(ExecutorType type)
