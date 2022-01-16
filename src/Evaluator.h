@@ -25,7 +25,7 @@ template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNum
          typename TPrinter = DefaultPrinter>
 TNumber Evaluate(const CompilationContext& context,
                  ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                 std::shared_ptr<const Operator>& op)
+                 const std::shared_ptr<const Operator>& op)
 {
     class Evaluator : public OperatorVisitor
     {

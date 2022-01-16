@@ -115,17 +115,21 @@ InstantiateGenerateStackMachineModule(mpz_class);
 
 InstantiateExecuteStackMachineModule(int32_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int32_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int32_t, StreamPrinter);
 InstantiateExecuteStackMachineModule(int64_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int64_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int64_t, StreamPrinter);
 
 #ifdef ENABLE_INT128
 InstantiateExecuteStackMachineModule(__int128_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(__int128_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(__int128_t, StreamPrinter);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
 InstantiateExecuteStackMachineModule(mpz_class, DefaultPrinter);
 InstantiateExecuteStackMachineModule(mpz_class, BufferedPrinter);
+InstantiateExecuteStackMachineModule(mpz_class, StreamPrinter);
 #endif // ENABLE_GMP
 
 /*****/
