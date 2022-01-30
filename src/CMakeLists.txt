@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 add_library(calc4-core STATIC Common.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Common.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h ReplCommon.h StackMachine.h SyntaxAnalysis.h)
-add_executable(calc4 Main.cpp Test.cpp)
+add_executable(calc4 Main.cpp ReplCommon.h)
 set_target_properties(calc4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_link_libraries(calc4 calc4-core)
 target_compile_features(calc4-core PUBLIC cxx_std_17)
