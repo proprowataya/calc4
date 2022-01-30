@@ -9,17 +9,21 @@
 
 #include "TestCommon.h"
 #include <gtest/gtest.h>
+#include <string>
+#include <unordered_map>
 
 struct ExecutionTestCaseBase
 {
     const char* input;
     int32_t expected;
     const char* expectedConsoleOutput;
+    std::unordered_map<std::string, int> expectedVariables;
+    std::unordered_map<int, int> expectedMemory;
 };
 
 using ExecutionTestCase = TestCase<ExecutionTestCaseBase>;
 
-constexpr ExecutionTestCaseBase ExecutionTestCaseBases[] = {
+ExecutionTestCaseBase ExecutionTestCaseBases[] = {
     // clang-format off
     { "1<2", 1 },
     { "1<=2", 1 },
@@ -56,26 +60,26 @@ constexpr ExecutionTestCaseBase ExecutionTestCaseBases[] = {
     { "D[set|x|xS] 7{set}LS[var1] L[zero]3{set}LS[var2] L[var1]*L[var2]", 21 },
     { "(123S)L*L", 15129 },
     { "(123S[var])L[var]*L[var]", 15129 },
-    { "((100+20+3)S)L*L", 15129 },
-    { "((100+20+3)S[var])L[var]*L[var]", 15129 },
+    { "((100+20+3)S)L*L", 15129, nullptr, { { "", 123 } } },
+    { "((100+20+3)S[var])L[var]*L[var]", 15129, nullptr, { { "var", 123 } } },
     { "D[op||(123S)L*L]{op}", 15129 },
     { "D[op||L*L](123S){op}", 15129 },
-    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}S)+L", 13530 },
-    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10?5)S {get}", 10 },
-    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10S?5S) {get}", 10 },
+    { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}S)+L", 13530, nullptr, { { "", 6765 } } },
+    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10?5)S {get}", 10, nullptr, { { "", 10 } } },
+    { "D[get||L] D[set|x|xS] D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] (20{fib}>=1000?10S?5S) {get}", 10, nullptr, { { "", 10 } } },
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 3{set} {fib2}", 2 },
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 20{set} {fib2}", 6765 },
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 3S {fib2}", 2 },
     { "D[fib|n|n<=1?n?((n-1){fib}+(n-2){fib})] D[fib2||L{fib}] D[set|x|xS] 20S {fib2}", 6765 },
-    { "D[fib|n|10S(n<=1?n?((n-1){fib}+(n-2){fib}))S] 20{fib} L", 6765 },
+    { "D[fib|n|10S(n<=1?n?((n-1){fib}+(n-2){fib}))S] 20{fib} L", 6765, nullptr, { { "", 6765 } } },
     { "0@", 0 },
-    { "5->0", 5 },
-    { "(10->20)L[zero]20@", 10 },
-    { "((4+6)->(10+10))(20@)", 10 },
-    { "D[func||(10->20)L[zero]20@] {func} (20@)", 10 },
-    { "D[func||((4+6)->(10+10))(20@)] {func} (20@)", 10 },
-    { "D[func||(10->20)L[zero]20@] D[get||20@] {func} (20@)", 10 },
-    { "D[func||((4+6)->(10+10))(20@)] D[get||20@] {func} {get}", 10 },
+    { "5->0", 5, nullptr, {}, { { 0, 5 } } },
+    { "(10->20)L[zero]20@", 10, nullptr, {}, { { 20, 10 } } },
+    { "((4+6)->(10+10))(20@)", 10, nullptr, {}, { { 20, 10 } } },
+    { "D[func||(10->20)L[zero]20@] {func} (20@)", 10, nullptr, {}, { { 20, 10 } } },
+    { "D[func||((4+6)->(10+10))(20@)] {func} (20@)", 10, nullptr, {}, { { 20, 10 } } },
+    { "D[func||(10->20)L[zero]20@] D[get||20@] {func} (20@)", 10, nullptr, {}, { { 20, 10 } } },
+    { "D[func||((4+6)->(10+10))(20@)] D[get||20@] {func} {get}", 10, nullptr, {}, { { 20, 10 } } },
     // clang-format on
 };
 
@@ -83,24 +87,47 @@ class ExecutionTest : public ::testing::TestWithParam<ExecutionTestCase>
 {
 };
 
+#ifdef ENABLE_INT128
+#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
+    do                                                                                             \
+    {                                                                                              \
+        if constexpr (std::is_same_v<TYPENAME, __int128_t>)                                        \
+        {                                                                                          \
+            ASSERT_TRUE(static_cast<__int128_t>(EXPECTED) == (ACTUAL));                            \
+        }                                                                                          \
+        else                                                                                       \
+        {                                                                                          \
+            ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL));                                  \
+        }                                                                                          \
+    } while (false)
+#else
+#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
+    ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL))
+#endif // ENABLE_INT128
+
 template<typename TNumber>
 void OperateOneExecutionTest(const ExecutionTestCase& test)
 {
-    auto [result, consoleOutput] = Execute<TNumber>(test.input, test.optimize, test.executorType);
+    auto [result, variables, memory, consoleOutput] =
+        Execute<TNumber>(test.input, test.optimize, test.executorType);
 
     const char* expectedConsoleOutput =
         test.expectedConsoleOutput != nullptr ? test.expectedConsoleOutput : "";
 
-#ifdef ENABLE_INT128
-    if constexpr (std::is_same_v<TNumber, __int128_t>)
+    // Validate execution result
+    ASSERT_EQ_HELPER(TNumber, test.expected, result);
+
+    // Validate variables
+    for (auto& variable : test.expectedVariables)
     {
-        bool comp = static_cast<__int128_t>(test.expected) == result;
-        ASSERT_TRUE(comp);
+        ASSERT_EQ_HELPER(TNumber, variable.second, variables.Get(variable.first));
     }
-    else
-#endif // ENABLE_INT128
+
+    // Validate memory
+    for (auto& memoryLocation : test.expectedMemory)
     {
-        ASSERT_EQ(static_cast<TNumber>(test.expected), result);
+        ASSERT_EQ_HELPER(TNumber, memoryLocation.second,
+                         memory.Get(static_cast<TNumber>(memoryLocation.first)));
     }
 
     ASSERT_STREQ(expectedConsoleOutput, consoleOutput.c_str());

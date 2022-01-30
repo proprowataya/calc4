@@ -50,6 +50,15 @@ enum class IntegerType
 #endif // ENABLE_GMP
 };
 
+template<typename TNumber>
+struct ExecutionResult
+{
+    TNumber result;
+    calc4::DefaultVariableSource<TNumber> variables;
+    calc4::DefaultGlobalArraySource<TNumber> memory;
+    std::string consoleOutput;
+};
+
 template<typename TTestCaseBase>
 struct TestCase : public TTestCaseBase
 {
@@ -103,7 +112,7 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
 }
 
 template<typename TNumber>
-std::pair<TNumber, std::string> Execute(const char* source, bool optimize, ExecutorType executor)
+ExecutionResult<TNumber> Execute(const char* source, bool optimize, ExecutorType executor)
 {
     using namespace calc4;
 
@@ -152,6 +161,6 @@ std::pair<TNumber, std::string> Execute(const char* source, bool optimize, Execu
         break;
     }
 
-    return std::make_pair(result, std::move(consoleOutput));
+    return { result, state.GetVariableSource(), state.GetArraySource(), std::move(consoleOutput) };
 }
 }
