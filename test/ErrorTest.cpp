@@ -18,6 +18,7 @@ struct ErrorTestCaseBase
 {
     const char* input;
     std::function<bool(const Calc4Exception&)> exceptionValidator;
+    std::function<bool(IntegerType, ExecutorType, bool /* optimize*/)> enableThisTest;
 };
 
 using ErrorTestCase = TestCase<ErrorTestCaseBase>;
@@ -28,14 +29,23 @@ std::function<bool(const Calc4Exception&)> CreateValidator()
     return [](const Calc4Exception& e) { return dynamic_cast<const TException*>(&e) != nullptr; };
 }
 
+std::function<bool(IntegerType, ExecutorType, bool)> EnableAllConfigurations()
+{
+    return [](IntegerType, ExecutorType, bool) { return true; };
+}
+
 ErrorTestCaseBase ErrorTestCaseBases[] = {
     // clang-format off
-    { "{notdefined}", CreateValidator<OperatorOrOperandNotDefinedException>() },
-    { "D[op|x, y]", CreateValidator<DefinitionTextNotSplittedProperlyException>() },
-    { "1+", CreateValidator<SomeOperandsMissingException>() },
-    { "(1+2", CreateValidator<TokenExpectedException>() },
-    { "1+2)", CreateValidator<UnexpectedTokenException>() },
-    { "", CreateValidator<CodeIsEmptyException>() },
+    { "{notdefined}", CreateValidator<OperatorOrOperandNotDefinedException>(), EnableAllConfigurations() },
+    { "D[op|x, y]", CreateValidator<DefinitionTextNotSplittedProperlyException>(), EnableAllConfigurations() },
+    { "1+", CreateValidator<SomeOperandsMissingException>(), EnableAllConfigurations() },
+    { "(1+2", CreateValidator<TokenExpectedException>(), EnableAllConfigurations() },
+    { "1+2)", CreateValidator<UnexpectedTokenException>(), EnableAllConfigurations() },
+    { "", CreateValidator<CodeIsEmptyException>(), EnableAllConfigurations() },
+    { "D[x||{x}] {x}", CreateValidator<StackOverflowException>(),
+      [](IntegerType, ExecutorType executor, bool optimize) {
+          return !optimize && executor == ExecutorType::StackMachine;
+      } },
     // clang-format on
 };
 
@@ -46,6 +56,11 @@ class ErrorTest : public ::testing::TestWithParam<ErrorTestCase>
 template<typename TNumber>
 void OperateOneErrorTest(const ErrorTestCase& test)
 {
+    if (!test.enableThisTest(test.integerType, test.executorType, test.optimize))
+    {
+        return;
+    }
+
     try
     {
         Execute<TNumber>(test.input, test.optimize, test.executorType);
