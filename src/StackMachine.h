@@ -36,6 +36,7 @@ enum class StackMachineOpcode : int8_t
     Sub,
     Mult,
     Div,
+    DivChecked,
     Mod,
     Goto,
     GotoIfTrue,
@@ -136,6 +137,11 @@ public:
     }
 };
 
+struct StackMachineCodeGenerationOption
+{
+    bool checkZeroDivision = false;
+};
+
 namespace
 {
 inline constexpr const char* ToString(StackMachineOpcode opcode)
@@ -201,8 +207,9 @@ inline constexpr const char* ToString(StackMachineOpcode opcode)
 }
 
 template<typename TNumber>
-StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<const Operator>& op,
-                                                       const CompilationContext& context);
+StackMachineModule<TNumber> GenerateStackMachineModule(
+    const std::shared_ptr<const Operator>& op, const CompilationContext& context,
+    const StackMachineCodeGenerationOption& option);
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,

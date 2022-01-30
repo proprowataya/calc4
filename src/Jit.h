@@ -17,8 +17,16 @@
 
 namespace calc4
 {
+struct JITCodeGenerationOption
+{
+    bool optimize = true;
+    bool checkZeroDivision = false;
+    bool dumpProgram = false;
+};
+
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 TNumber EvaluateByJIT(const CompilationContext& context,
                       ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<const Operator>& op, bool optimize, bool dumpProgram);
+                      const std::shared_ptr<const Operator>& op,
+                      const JITCodeGenerationOption& option);
 }

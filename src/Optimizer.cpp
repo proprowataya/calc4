@@ -147,7 +147,9 @@ public:
         std::shared_ptr<const Operator> right = Precompute(op->GetRight());
 
         TNumber leftValue, rightValue;
-        if (TryGetPrecomputedValue(left, &leftValue) && TryGetPrecomputedValue(right, &rightValue))
+        if (TryGetPrecomputedValue(left, &leftValue) &&
+            TryGetPrecomputedValue(right, &rightValue) &&
+            !(op->GetType() == BinaryType::Div && rightValue == 0))
         {
             TNumber result;
 

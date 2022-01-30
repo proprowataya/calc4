@@ -65,11 +65,12 @@ struct TestCase : public TTestCaseBase
     IntegerType integerType;
     ExecutorType executorType;
     bool optimize;
+    bool checkZeroDivision;
 
     TestCase(const TTestCaseBase& base, IntegerType integerType, ExecutorType executorType,
-             bool optimize)
+             bool optimize, bool checkZeroDivision)
         : TTestCaseBase(base), integerType(integerType), executorType(executorType),
-          optimize(optimize)
+          optimize(optimize), checkZeroDivision(checkZeroDivision)
     {
     }
 };
@@ -83,27 +84,34 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
     {
         for (auto optimize : { true, false })
         {
-            for (auto executor : { ExecutorType::Interpreter, ExecutorType::StackMachine,
-#ifdef ENABLE_JIT
-                                   ExecutorType::JIT
-#endif // ENABLE_JIT
-                 })
+            for (auto checkZeroDivision : { true, false })
             {
-                result.emplace_back(base, IntegerType::Int32, executor, optimize);
-                result.emplace_back(base, IntegerType::Int64, executor, optimize);
+                for (auto executor : { ExecutorType::Interpreter, ExecutorType::StackMachine,
+#ifdef ENABLE_JIT
+                                       ExecutorType::JIT
+#endif // ENABLE_JIT
+                     })
+                {
+                    result.emplace_back(base, IntegerType::Int32, executor, checkZeroDivision,
+                                        optimize);
+                    result.emplace_back(base, IntegerType::Int64, executor, checkZeroDivision,
+                                        optimize);
 
 #ifdef ENABLE_INT128
-                result.emplace_back(base, IntegerType::Int128, executor, optimize);
+                    result.emplace_back(base, IntegerType::Int128, executor, checkZeroDivision,
+                                        optimize);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
 #ifdef ENABLE_JIT
-                if (executor != ExecutorType::JIT)
+                    if (executor != ExecutorType::JIT)
 #endif // ENABLE_JIT
-                {
-                    result.emplace_back(base, IntegerType::GMP, executor, optimize);
-                }
+                    {
+                        result.emplace_back(base, IntegerType::GMP, executor, checkZeroDivision,
+                                            optimize);
+                    }
 #endif // ENABLE_GMP
+                }
             }
         }
     }
@@ -112,7 +120,8 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
 }
 
 template<typename TNumber>
-ExecutionResult<TNumber> Execute(const char* source, bool optimize, ExecutorType executor)
+ExecutionResult<TNumber> Execute(const char* source, bool optimize, bool checkZeroDivision,
+                                 ExecutorType executor)
 {
     using namespace calc4;
 
@@ -143,13 +152,14 @@ ExecutionResult<TNumber> Execute(const char* source, bool optimize, ExecutorType
         else
 #endif // ENABLE_GMP
         {
-            result = EvaluateByJIT<TNumber>(context, state, op, optimize, false);
+            result =
+                EvaluateByJIT<TNumber>(context, state, op, { optimize, checkZeroDivision, false });
         }
         break;
 #endif // ENABLE_JIT
     case ExecutorType::StackMachine:
     {
-        auto module = GenerateStackMachineModule<TNumber>(op, context);
+        auto module = GenerateStackMachineModule<TNumber>(op, context, { checkZeroDivision });
         result = ExecuteStackMachineModule(module, state);
         break;
     }

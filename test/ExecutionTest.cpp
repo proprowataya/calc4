@@ -109,7 +109,7 @@ template<typename TNumber>
 void OperateOneExecutionTest(const ExecutionTestCase& test)
 {
     auto [result, variables, memory, consoleOutput] =
-        Execute<TNumber>(test.input, test.optimize, test.executorType);
+        Execute<TNumber>(test.input, test.optimize, test.checkZeroDivision, test.executorType);
 
     const char* expectedConsoleOutput =
         test.expectedConsoleOutput != nullptr ? test.expectedConsoleOutput : "";

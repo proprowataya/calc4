@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Exceptions.h"
 #include "ExecutionState.h"
 #include "Operators.h"
 
@@ -148,6 +149,10 @@ TNumber Evaluate(const CompilationContext& context,
                 value = left * right;
                 break;
             case BinaryType::Div:
+                if (right == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
                 value = left / right;
                 break;
             case BinaryType::Mod:
