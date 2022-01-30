@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.8)
 
-project(calc4 CXX)
-add_executable(calc4 Common.cpp Main.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Test.cpp Common.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h ReplCommon.h StackMachine.h SyntaxAnalysis.h Test.h)
-target_compile_features(calc4 PUBLIC cxx_std_17)
+add_library(calc4-core STATIC Common.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Common.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h ReplCommon.h StackMachine.h SyntaxAnalysis.h)
+add_executable(calc4 Main.cpp Test.cpp)
+set_target_properties(calc4 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+target_link_libraries(calc4 calc4-core)
+target_compile_features(calc4-core PUBLIC cxx_std_17)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
@@ -10,7 +12,7 @@ endif()
 
 if (NOT MSVC)
     # Assume we are using GCC or clang
-    target_compile_definitions(calc4 PUBLIC ENABLE_INT128)
+    target_compile_definitions(calc4-core PUBLIC ENABLE_INT128)
 endif()
 
 if (NOT DEFINED LLVM_CONFIG)
@@ -19,13 +21,13 @@ endif()
 
 option(NO_USE_COMPUTED_GOTO "Disable the computed goto technique on the stack machine" OFF)
 if (NO_USE_COMPUTED_GOTO)
-    target_compile_definitions(calc4 PUBLIC NO_USE_COMPUTED_GOTO)
+    target_compile_definitions(calc4-core PUBLIC NO_USE_COMPUTED_GOTO)
 endif()
 
 option(ENABLE_JIT "Enable the JIT compilation with LLVM" OFF)
 if (ENABLE_JIT)
-    target_sources(calc4 PRIVATE Jit.cpp Jit.h)
-    target_compile_definitions(calc4 PUBLIC ENABLE_JIT)
+    target_sources(calc4-core PRIVATE Jit.cpp Jit.h)
+    target_compile_definitions(calc4-core PUBLIC ENABLE_JIT)
 
     execute_process(COMMAND ${LLVM_CONFIG} --cxxflags OUTPUT_VARIABLE LLVM_CXXFLAGS)
     # Remove unnecessary language version specification
@@ -42,17 +44,17 @@ if (ENABLE_JIT)
 
     # Split arguments
     string(REGEX REPLACE "[ ]+" ";" LLVM_CXXFLAGS ${LLVM_CXXFLAGS})
-    target_compile_options(calc4 PUBLIC ${LLVM_CXXFLAGS})
+    target_compile_options(calc4-core PUBLIC ${LLVM_CXXFLAGS})
 
     execute_process(COMMAND ${LLVM_CONFIG} --ldflags --libs --system-libs OUTPUT_VARIABLE LLVM_LDFLAGS)
     string(REGEX REPLACE "[\r\n]+" " " LLVM_LDFLAGS ${LLVM_LDFLAGS})
     string(REGEX REPLACE "[ ]+" ";" LLVM_LDFLAGS ${LLVM_LDFLAGS})
-    target_link_libraries(calc4 PUBLIC ${LLVM_LDFLAGS})
+    target_link_libraries(calc4-core PUBLIC ${LLVM_LDFLAGS})
 
     if (MSVC)
-        target_compile_options(calc4 PUBLIC "/sdl-" "/MP")
+        target_compile_options(calc4-core PUBLIC "/sdl-" "/MP")
     else()
-        target_compile_options(calc4 PUBLIC "-fexceptions" "-Wno-unknown-warning-option" "-Wno-unused-command-line-argument")
+        target_compile_options(calc4-core PUBLIC "-fexceptions" "-Wno-unknown-warning-option" "-Wno-unused-command-line-argument")
     endif()
 endif()
 
@@ -61,6 +63,6 @@ if (ENABLE_GMP)
     if (MSVC)
         message(FATAL_ERROR "Infinite-precision integers are not supported on the Windows platform.")
     endif()
-    target_compile_definitions(calc4 PUBLIC ENABLE_GMP)
-    target_link_libraries(calc4 PUBLIC "-lgmpxx" "-lgmp")
+    target_compile_definitions(calc4-core PUBLIC ENABLE_GMP)
+    target_link_libraries(calc4-core PUBLIC "-lgmpxx" "-lgmp")
 endif()
