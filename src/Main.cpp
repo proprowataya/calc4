@@ -14,7 +14,6 @@
 #include "ReplCommon.h"
 #include "StackMachine.h"
 #include "SyntaxAnalysis.h"
-#include "Test.h"
 
 #ifdef ENABLE_JIT
 #include "Jit.h"
@@ -52,7 +51,6 @@ constexpr std::string_view EnableOptimization = "-O1";
 constexpr std::string_view DisableOptimization = "-O0";
 constexpr std::string_view InfinitePrecisionInteger = "inf";
 constexpr std::string_view DumpProgram = "--dump";
-constexpr std::string_view PerformTest = "--test";
 }
 
 namespace ReplCommands
@@ -100,16 +98,6 @@ int main(int argc, char** argv)
         LLVMInitializeNativeAsmParser();
     }
 #endif // ENABLE_JIT
-
-    /* ***** Perform test if specified ***** */
-    if (performTest)
-    {
-        TestAll();
-#ifdef ENABLE_JIT
-        llvm_shutdown();
-#endif // ENABLE_JIT
-        return 0;
-    }
 
     switch (option.integerSize)
     {
@@ -227,10 +215,6 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             else if (str == CommandLineArgs::DumpProgram)
             {
                 option.dumpProgram = true;
-            }
-            else if (str == CommandLineArgs::PerformTest)
-            {
-                performTest = true;
             }
             else
             {
@@ -450,8 +434,6 @@ void PrintHelp(int argc, char** argv)
          << Indent << "Always use the tree traversal executors (very slow)" << endl
          << CommandLineArgs::DumpProgram << endl
          << Indent << "Dump the given program's structures such as an abstract syntax tree" << endl
-         << CommandLineArgs::PerformTest << endl
-         << Indent << "Perform test" << endl
          << endl
          << "During the Repl mode, the following commands are available:" << endl
          << Indent << ReplCommands::DumpOff << endl
