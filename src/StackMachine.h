@@ -180,6 +180,8 @@ inline constexpr const char* ToString(StackMachineOpcode opcode)
         return "Mult";
     case StackMachineOpcode::Div:
         return "Div";
+    case StackMachineOpcode::DivChecked:
+        return "DivChecked";
     case StackMachineOpcode::Mod:
         return "Mod";
     case StackMachineOpcode::Goto:
