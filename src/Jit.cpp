@@ -12,6 +12,7 @@
 #endif // !ENABLE_JIT
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <unordered_map>
@@ -39,6 +40,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "Exceptions.h"
 #include "Jit.h"
 #include "Operators.h"
 
@@ -51,7 +53,7 @@ namespace calc4
         const CompilationContext& context,                                                         \
         ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
                        TPrinter>& state,                                                           \
-        const std::shared_ptr<const Operator>& op, bool optimize, bool dumpProgram)
+        const std::shared_ptr<const Operator>& op, const JITCodeGenerationOption& option)
 
 InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
 InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
@@ -74,7 +76,7 @@ template<typename TNumber>
 size_t IntegerBits = sizeof(TNumber) * 8;
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-void GenerateIR(const CompilationContext& context,
+void GenerateIR(const CompilationContext& context, const JITCodeGenerationOption& option,
                 ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
                 const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
                 llvm::Module* llvmModule);
@@ -82,6 +84,9 @@ void GenerateIR(const CompilationContext& context,
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 class IRGenerator;
 }
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void ThrowZeroDivisionException(void* state);
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 void PrintChar(void* state, char c);
@@ -101,7 +106,8 @@ void StoreArray(void* state, TNumber index, TNumber value);
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 TNumber EvaluateByJIT(const CompilationContext& context,
                       ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<const Operator>& op, bool optimize, bool dumpProgram)
+                      const std::shared_ptr<const Operator>& op,
+                      const JITCodeGenerationOption& option)
 {
     using namespace llvm;
     LLVMContext Context;
@@ -112,10 +118,10 @@ TNumber EvaluateByJIT(const CompilationContext& context,
     M->setTargetTriple(LLVM_HOST_TRIPLE);
 
     /* ***** Generate LLVM-IR ***** */
-    GenerateIR<TNumber>(context, state, op, &Context, M);
+    GenerateIR<TNumber>(context, option, state, op, &Context, M);
 
     /* ***** Optimize ***** */
-    if (optimize)
+    if (option.optimize)
     {
         static constexpr int OptLevel = 3, SizeLevel = 0;
 
@@ -140,7 +146,7 @@ TNumber EvaluateByJIT(const CompilationContext& context,
         PM.run(*M);
     }
 
-    if (dumpProgram)
+    if (option.dumpProgram)
     {
         // PrintIR
         outs() << "/*\n * LLVM IR\n */\n===============\n" << *M << "===============\n\n";
@@ -175,7 +181,7 @@ TNumber EvaluateByJIT(const CompilationContext& context,
 namespace
 {
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-void GenerateIR(const CompilationContext& context,
+void GenerateIR(const CompilationContext& context, const JITCodeGenerationOption& option,
                 ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
                 const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
                 llvm::Module* llvmModule)
@@ -211,14 +217,14 @@ void GenerateIR(const CompilationContext& context,
 
     /* ***** Generate IR ****** */
     // Local helper function
-    auto Emit = [llvmModule, llvmContext, &functionMap](llvm::Function* function,
-                                                        const std::shared_ptr<const Operator>& op,
-                                                        bool isMainFunction) {
+    auto Emit = [llvmModule, llvmContext, &functionMap,
+                 &option](llvm::Function* function, const std::shared_ptr<const Operator>& op,
+                          bool isMainFunction) {
         llvm::BasicBlock* block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         auto builder = std::make_shared<llvm::IRBuilder<>>(block);
 
         IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
-            llvmModule, llvmContext, function, builder, functionMap, isMainFunction);
+            llvmModule, llvmContext, function, builder, functionMap, option, isMainFunction);
         generator.BeginFunction();
         op->Accept(generator);
         generator.EndFunction();
@@ -251,17 +257,19 @@ protected:
     llvm::Function* function;
     std::shared_ptr<llvm::IRBuilder<>> builder;
     std::unordered_map<std::string, llvm::Function*> functionMap;
+    JITCodeGenerationOption option;
     bool isMainFunction;
 
-    InternalFunction printChar, loadVariable, storeVariable, loadArray, storeArray;
+    InternalFunction throwZeroDivision, printChar, loadVariable, storeVariable, loadArray,
+        storeArray;
 
 public:
     IRGeneratorBase(llvm::Module* module, llvm::LLVMContext* context, llvm::Function* function,
                     const std::shared_ptr<llvm::IRBuilder<>>& builder,
                     const std::unordered_map<std::string, llvm::Function*>& functionMap,
-                    bool isMainFunction)
+                    const JITCodeGenerationOption& option, bool isMainFunction)
         : module(module), context(context), function(function), builder(builder),
-          functionMap(functionMap), isMainFunction(isMainFunction)
+          functionMap(functionMap), option(option), isMainFunction(isMainFunction)
     {
 #define GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, ...)                                                   \
     llvm::FunctionType::get(RETURN_TYPE, { __VA_ARGS__ }, false)
@@ -278,6 +286,9 @@ public:
         llvm::Type* voidPointerType = voidType->getPointerTo(0);
         llvm::Type* integerType = builder->getIntNTy(IntegerBits<TNumber>);
         llvm::Type* stringType = builder->getInt8Ty()->getPointerTo(0);
+
+        throwZeroDivision = GET_INTERNAL_FUNCTION(
+            ThrowZeroDivisionException, llvm::Type::getVoidTy(*this->context), { voidPointerType });
 
         printChar = GET_INTERNAL_FUNCTION(PrintChar, llvm::Type::getVoidTy(*this->context),
                                           { voidPointerType, this->builder->getInt8Ty() });
@@ -342,22 +353,24 @@ public:
         llvm::GlobalVariable* variableName =
             this->builder->CreateGlobalString(op->GetVariableName());
         this->value = CallInternalFunction(this->loadVariable,
-                                           { &*this->function->arg_begin(), variableName });
+                                           { &*this->function->arg_begin(), variableName },
+                                           this->builder.get());
     };
 
     virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
     {
         op->GetIndex()->Accept(*this);
         auto index = value;
-        this->value =
-            CallInternalFunction(this->loadArray, { &*this->function->arg_begin(), index });
+        this->value = CallInternalFunction(
+            this->loadArray, { &*this->function->arg_begin(), index }, this->builder.get());
     };
 
     virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
     {
         op->GetCharacter()->Accept(*this);
         auto casted = this->builder->CreateTrunc(value, llvm::Type::getInt8Ty(*this->context));
-        CallInternalFunction(this->printChar, { &*this->function->arg_begin(), casted });
+        CallInternalFunction(this->printChar, { &*this->function->arg_begin(), casted },
+                             this->builder.get());
         this->value = this->builder->getIntN(IntegerBits<TNumber>, 0);
     };
 
@@ -387,7 +400,8 @@ public:
         llvm::GlobalVariable* variableName =
             this->builder->CreateGlobalString(op->GetVariableName());
         CallInternalFunction(this->storeVariable,
-                             { &*this->function->arg_begin(), variableName, value });
+                             { &*this->function->arg_begin(), variableName, value },
+                             this->builder.get());
     }
 
     virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
@@ -399,7 +413,8 @@ public:
         auto index = value;
 
         CallInternalFunction(this->storeArray,
-                             { &*this->function->arg_begin(), index, valueToBeStored });
+                             { &*this->function->arg_begin(), index, valueToBeStored },
+                             this->builder.get());
         this->value = valueToBeStored;
     }
 
@@ -422,8 +437,38 @@ public:
             this->value = this->builder->CreateMul(left, right);
             break;
         case BinaryType::Div:
+        {
+            if (this->option.checkZeroDivision)
+            {
+                llvm::BasicBlock* whenDivisorIsZero =
+                    llvm::BasicBlock::Create(*this->context, "", this->function);
+
+                llvm::BasicBlock* divisionCore =
+                    llvm::BasicBlock::Create(*this->context, "", this->function);
+
+                // Branch if divisor is zero
+                auto cond = this->builder->CreateICmpEQ(
+                    right, this->builder->getIntN(IntegerBits<TNumber>, 0));
+                this->builder->CreateCondBr(cond, whenDivisorIsZero, divisionCore);
+
+                // Code generation for when divisor is zero
+                {
+                    std::unique_ptr<llvm::IRBuilder<>> whenDivisorIsZeroBuilder =
+                        std::make_unique<llvm::IRBuilder<>>(whenDivisorIsZero);
+                    CallInternalFunction(this->throwZeroDivision, { &*this->function->arg_begin() },
+                                         whenDivisorIsZeroBuilder.get());
+                    whenDivisorIsZeroBuilder->CreateUnreachable();
+                }
+
+                // Code generation for when divisor is not zero
+                std::shared_ptr<llvm::IRBuilder<>> divisionCoreBuilder =
+                    std::make_shared<llvm::IRBuilder<>>(divisionCore);
+                this->builder = std::move(divisionCoreBuilder);
+            }
+
             this->value = this->builder->CreateSDiv(left, right);
             break;
+        }
         case BinaryType::Mod:
             this->value = this->builder->CreateSRem(left, right);
             break;
@@ -499,7 +544,7 @@ public:
             auto builder = std::make_shared<llvm::IRBuilder<>>(block);
             IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
                 this->module, this->context, this->function, builder, this->functionMap,
-                this->isMainFunction);
+                this->option, this->isMainFunction);
             op->Accept(generator);
             generator.builder->CreateStore(generator.value, temp);
             return (this->builder = generator.builder);
@@ -538,12 +583,12 @@ public:
 
 private:
     llvm::CallInst* CallInternalFunction(const InternalFunction& func,
-                                         llvm::ArrayRef<llvm::Value*> arguments)
+                                         llvm::ArrayRef<llvm::Value*> arguments,
+                                         llvm::IRBuilder<>* builder)
     {
-        auto functionPtr =
-            this->builder->CreateCast(llvm::Instruction::CastOps::IntToPtr, func.address,
-                                      llvm::PointerType::get(func.type, 0));
-        return this->builder->CreateCall(func.type, functionPtr, arguments);
+        auto functionPtr = builder->CreateCast(llvm::Instruction::CastOps::IntToPtr, func.address,
+                                               llvm::PointerType::get(func.type, 0));
+        return builder->CreateCall(func.type, functionPtr, arguments);
     }
 
     llvm::Type* GetIntegerType() const
@@ -551,6 +596,21 @@ private:
         return this->builder->getIntNTy(IntegerBits<TNumber>);
     }
 };
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+void ThrowZeroDivisionException(void* state)
+{
+#ifdef _MSC_VER
+    // TODO: On Windows systems, there is a problem where exceptions thrown in the Jitted functions
+    // will not be properly handled by the caller. For the time being, we terminate process
+    // immediately if some error occurs.
+    std::cout << "Error: " << Exceptions::ZeroDivisionException(std::nullopt).what() << std::endl
+              << "The program will be terminated immediately." << std::endl;
+    exit(EXIT_FAILURE);
+#else
+    throw Exceptions::ZeroDivisionException(std::nullopt);
+#endif // _MSC_VER
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>

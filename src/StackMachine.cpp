@@ -90,7 +90,8 @@ namespace calc4
 {
 #define InstantiateGenerateStackMachineModule(TNumber)                                             \
     template StackMachineModule<TNumber> GenerateStackMachineModule(                               \
-        const std::shared_ptr<const Operator>& op, const CompilationContext& context)
+        const std::shared_ptr<const Operator>& op, const CompilationContext& context,              \
+        const StackMachineCodeGenerationOption& option)
 
 InstantiateGenerateStackMachineModule(int32_t);
 InstantiateGenerateStackMachineModule(int64_t);
@@ -205,8 +206,9 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
 }
 
 template<typename TNumber>
-StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<const Operator>& op,
-                                                       const CompilationContext& context)
+StackMachineModule<TNumber> GenerateStackMachineModule(
+    const std::shared_ptr<const Operator>& op, const CompilationContext& context,
+    const StackMachineCodeGenerationOption& option)
 {
     static constexpr int OperatorBeginLabel = 0;
 
@@ -214,6 +216,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     {
     public:
         const CompilationContext& context;
+        StackMachineCodeGenerationOption option;
         std::vector<TNumber>& constTable;
         std::unordered_map<OperatorDefinition, int>& operatorLabels;
         std::optional<OperatorDefinition> definition;
@@ -224,12 +227,14 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
         int stackSize = 0;
         int maxStackSize = 0;
 
-        Generator(const CompilationContext& context, std::vector<TNumber>& constTable,
+        Generator(const CompilationContext& context, const StackMachineCodeGenerationOption& option,
+                  std::vector<TNumber>& constTable,
                   std::unordered_map<OperatorDefinition, int>& operatorLabels,
                   const std::optional<OperatorDefinition>& definition,
                   std::unordered_map<std::string, int>& variableIndices)
-            : context(context), constTable(constTable), operatorLabels(operatorLabels),
-              definition(definition), variableIndices(variableIndices)
+            : context(context), option(option), constTable(constTable),
+              operatorLabels(operatorLabels), definition(definition),
+              variableIndices(variableIndices)
         {
         }
 
@@ -433,7 +438,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
                 AddOperation(StackMachineOpcode::Mult);
                 break;
             case BinaryType::Div:
-                AddOperation(StackMachineOpcode::Div);
+                AddOperation(option.checkZeroDivision ? StackMachineOpcode::DivChecked
+                                                      : StackMachineOpcode::Div);
                 break;
             case BinaryType::Mod:
                 AddOperation(StackMachineOpcode::Mod);
@@ -604,6 +610,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
             case StackMachineOpcode::Sub:
             case StackMachineOpcode::Mult:
             case StackMachineOpcode::Div:
+            case StackMachineOpcode::DivChecked:
             case StackMachineOpcode::Mod:
             case StackMachineOpcode::GotoIfTrue:
             case StackMachineOpcode::Return:
@@ -683,7 +690,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
     {
         auto& implement = it->second;
-        Generator generator(context, constTable, operatorLabels, implement.GetDefinition(),
+        Generator generator(context, option, constTable, operatorLabels, implement.GetDefinition(),
                             variableIndices);
         generator.Generate(implement.GetOperator());
 
@@ -700,7 +707,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     // Generate Main code
     std::vector<StackMachineOperation> entryPoint;
     {
-        Generator generator(context, constTable, operatorLabels, std::nullopt, variableIndices);
+        Generator generator(context, option, constTable, operatorLabels, std::nullopt,
+                            variableIndices);
         generator.Generate(op);
         entryPoint = std::move(generator.operations);
     }
@@ -758,6 +766,7 @@ TNumber ExecuteStackMachineModule(
         &&COMPUTED_GOTO_LABEL_OF(Sub),
         &&COMPUTED_GOTO_LABEL_OF(Mult),
         &&COMPUTED_GOTO_LABEL_OF(Div),
+        &&COMPUTED_GOTO_LABEL_OF(DivChecked),
         &&COMPUTED_GOTO_LABEL_OF(Mod),
         &&COMPUTED_GOTO_LABEL_OF(Goto),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
@@ -900,6 +909,25 @@ TNumber ExecuteStackMachineModule(
         {
             top--;
             top[-1] = top[-1] / *top;
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(DivChecked)
+        {
+            // This block is required in order to ensure that the 'divisor' variable will be
+            // properly destructed before jumping by COMPUTED_GOTO_JUMP macro.
+            {
+                top--;
+
+                TNumber divisor = *top;
+                if (divisor == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
+
+                top[-1] = top[-1] / divisor;
+            }
+
             COMPUTED_GOTO_NEXT_OPERATION();
         }
 

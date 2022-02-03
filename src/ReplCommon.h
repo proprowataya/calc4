@@ -70,6 +70,7 @@ struct Option
     TreeTraversalExecutorMode treeExecutorMode =
         TreeTraversalExecutorMode::WhenNoRecursiveOperators;
     bool optimize = true;
+    bool checkZeroDivision = true;
     bool dumpProgram = false;
 };
 
@@ -283,13 +284,16 @@ TNumber ExecuteOperator(
         else
 #endif // ENABLE_GMP
         {
-            return EvaluateByJIT<TNumber>(context, state, op, option.optimize, option.dumpProgram);
+            return EvaluateByJIT<TNumber>(
+                context, state, op,
+                { option.optimize, option.checkZeroDivision, option.dumpProgram });
         }
         break;
 #endif // ENABLE_JIT
     case ExecutorType::StackMachine:
     {
-        auto module = GenerateStackMachineModule<TNumber>(op, context);
+        auto module =
+            GenerateStackMachineModule<TNumber>(op, context, { option.checkZeroDivision });
 
         if (option.dumpProgram)
         {
