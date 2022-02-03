@@ -47,6 +47,7 @@ ErrorTestCaseBase ErrorTestCaseBases[] = {
       [](IntegerType, ExecutorType executor, bool optimize, bool) {
           return !optimize && executor == ExecutorType::StackMachine;
       } },
+#ifndef _MSC_VER
     { "1/0", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
@@ -67,6 +68,7 @@ ErrorTestCaseBase ErrorTestCaseBases[] = {
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
+#endif // !_MSC_VER
     // clang-format on
 };
 

@@ -12,6 +12,7 @@
 #endif // !ENABLE_JIT
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <unordered_map>
@@ -600,7 +601,16 @@ private:
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
 void ThrowZeroDivisionException(void* state)
 {
+#ifdef _MSC_VER
+    // TODO: On Windows systems, there is a problem where exceptions thrown in the Jitted functions
+    // will not be properly handled by the caller. For the time being, we terminate process
+    // immediately if some error occurs.
+    std::cout << "Error: " << Exceptions::ZeroDivisionException(std::nullopt).what() << std::endl
+              << "The program will be terminated immediately." << std::endl;
+    exit(EXIT_FAILURE);
+#else
     throw Exceptions::ZeroDivisionException(std::nullopt);
+#endif // _MSC_VER
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
