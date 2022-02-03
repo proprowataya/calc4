@@ -22,6 +22,58 @@
 #include <gmpxx.h>
 #endif // ENABLE_GMP
 
+// We use the computed goto technique to make dispatch faster.
+// This technique is not available on MSVC.
+#if !defined(NO_USE_COMPUTED_GOTO) && (defined(__GNUC__) || defined(__clang__))
+#define USE_COMPUTED_GOTO
+#endif // !defined(NO_USE_COMPUTED_GOTO) && (defined(__GNUC__) || defined(__clang__))
+
+#ifdef USE_COMPUTED_GOTO
+#define COMPUTED_GOTO_BEGIN() goto*(op->address)
+#define COMPUTED_GOTO_SWITCH()
+#define COMPUTED_GOTO_LABEL_OF(LABEL) COMPUTED_GOTO_LABEL_##LABEL
+#define COMPUTED_GOTO_CASE(NAME) COMPUTED_GOTO_LABEL_OF(NAME) :
+#define COMPUTED_GOTO_DEFAULT()
+#define COMPUTED_GOTO_JUMP(DEST)                                                                   \
+    do                                                                                             \
+    {                                                                                              \
+        op = &operations[(DEST)];                                                                  \
+        goto*(op->address);                                                                        \
+    } while (false)
+#define COMPUTED_GOTO_NEXT_OPERATION()                                                             \
+    do                                                                                             \
+    {                                                                                              \
+        ++op;                                                                                      \
+        goto*(op->address);                                                                        \
+    } while (false)
+
+struct ComputedGotoOperation
+{
+    const void* address;
+    calc4::StackMachineOperation::ValueType value;
+};
+#else
+#define COMPUTED_GOTO_BEGIN()
+#define COMPUTED_GOTO_SWITCH()                                                                     \
+    LoopBegin:                                                                                     \
+    switch (op->opcode)
+#define COMPUTED_GOTO_LABEL_OF(LABEL) LABEL
+#define COMPUTED_GOTO_CASE(NAME) case StackMachineOpcode::NAME:
+#define COMPUTED_GOTO_DEFAULT() default:
+#define COMPUTED_GOTO_JUMP(DEST)                                                                   \
+    do                                                                                             \
+    {                                                                                              \
+        op = &operations[(DEST)];                                                                  \
+        goto LoopBegin;                                                                            \
+    } while (false)
+#define COMPUTED_GOTO_NEXT_OPERATION()                                                             \
+    do                                                                                             \
+    {                                                                                              \
+        ++op;                                                                                      \
+        goto LoopBegin;                                                                            \
+    } while (false)
+#endif // USE_COMPUTED_GOTO
+
 namespace std
 {
 template<>
@@ -38,7 +90,8 @@ namespace calc4
 {
 #define InstantiateGenerateStackMachineModule(TNumber)                                             \
     template StackMachineModule<TNumber> GenerateStackMachineModule(                               \
-        const std::shared_ptr<const Operator>& op, const CompilationContext& context)
+        const std::shared_ptr<const Operator>& op, const CompilationContext& context,              \
+        const StackMachineCodeGenerationOption& option)
 
 InstantiateGenerateStackMachineModule(int32_t);
 InstantiateGenerateStackMachineModule(int64_t);
@@ -63,17 +116,21 @@ InstantiateGenerateStackMachineModule(mpz_class);
 
 InstantiateExecuteStackMachineModule(int32_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int32_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int32_t, StreamPrinter);
 InstantiateExecuteStackMachineModule(int64_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(int64_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int64_t, StreamPrinter);
 
 #ifdef ENABLE_INT128
 InstantiateExecuteStackMachineModule(__int128_t, DefaultPrinter);
 InstantiateExecuteStackMachineModule(__int128_t, BufferedPrinter);
+InstantiateExecuteStackMachineModule(__int128_t, StreamPrinter);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
 InstantiateExecuteStackMachineModule(mpz_class, DefaultPrinter);
 InstantiateExecuteStackMachineModule(mpz_class, BufferedPrinter);
+InstantiateExecuteStackMachineModule(mpz_class, StreamPrinter);
 #endif // ENABLE_GMP
 
 /*****/
@@ -136,7 +193,7 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
         case StackMachineOpcode::Call:
         {
             int operatorNo = result[i].value;
-            result[i].value = startAddresses[operatorNo] - 1;
+            result[i].value = startAddresses[operatorNo];
             maxStackSizes[result[i].value] = userDefinedOperators[operatorNo].GetMaxStackSize();
             break;
         }
@@ -149,8 +206,9 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
 }
 
 template<typename TNumber>
-StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<const Operator>& op,
-                                                       const CompilationContext& context)
+StackMachineModule<TNumber> GenerateStackMachineModule(
+    const std::shared_ptr<const Operator>& op, const CompilationContext& context,
+    const StackMachineCodeGenerationOption& option)
 {
     static constexpr int OperatorBeginLabel = 0;
 
@@ -158,6 +216,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     {
     public:
         const CompilationContext& context;
+        StackMachineCodeGenerationOption option;
         std::vector<TNumber>& constTable;
         std::unordered_map<OperatorDefinition, int>& operatorLabels;
         std::optional<OperatorDefinition> definition;
@@ -168,12 +227,14 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
         int stackSize = 0;
         int maxStackSize = 0;
 
-        Generator(const CompilationContext& context, std::vector<TNumber>& constTable,
+        Generator(const CompilationContext& context, const StackMachineCodeGenerationOption& option,
+                  std::vector<TNumber>& constTable,
                   std::unordered_map<OperatorDefinition, int>& operatorLabels,
                   const std::optional<OperatorDefinition>& definition,
                   std::unordered_map<std::string, int>& variableIndices)
-            : context(context), constTable(constTable), operatorLabels(operatorLabels),
-              definition(definition), variableIndices(variableIndices)
+            : context(context), option(option), constTable(constTable),
+              operatorLabels(operatorLabels), definition(definition),
+              variableIndices(variableIndices)
         {
         }
 
@@ -230,10 +291,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
                 case StackMachineOpcode::GotoIfEqual:
                 case StackMachineOpcode::GotoIfLessThan:
                 case StackMachineOpcode::GotoIfLessThanOrEqual:
-                    // The destination address in LowLevelOperation should be just before it,
-                    // because program counter will be incremented after execution of this
-                    // operation.
-                    operation.value = labelMap.at(operation.value) - 1;
+                    operation.value = labelMap.at(operation.value);
                     break;
                 default:
                     break;
@@ -380,7 +438,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
                 AddOperation(StackMachineOpcode::Mult);
                 break;
             case BinaryType::Div:
-                AddOperation(StackMachineOpcode::Div);
+                AddOperation(option.checkZeroDivision ? StackMachineOpcode::DivChecked
+                                                      : StackMachineOpcode::Div);
                 break;
             case BinaryType::Mod:
                 AddOperation(StackMachineOpcode::Mod);
@@ -551,6 +610,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
             case StackMachineOpcode::Sub:
             case StackMachineOpcode::Mult:
             case StackMachineOpcode::Div:
+            case StackMachineOpcode::DivChecked:
             case StackMachineOpcode::Mod:
             case StackMachineOpcode::GotoIfTrue:
             case StackMachineOpcode::Return:
@@ -630,7 +690,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
     {
         auto& implement = it->second;
-        Generator generator(context, constTable, operatorLabels, implement.GetDefinition(),
+        Generator generator(context, option, constTable, operatorLabels, implement.GetDefinition(),
                             variableIndices);
         generator.Generate(implement.GetOperator());
 
@@ -647,7 +707,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(const std::shared_ptr<con
     // Generate Main code
     std::vector<StackMachineOperation> entryPoint;
     {
-        Generator generator(context, constTable, operatorLabels, std::nullopt, variableIndices);
+        Generator generator(context, option, constTable, operatorLabels, std::nullopt,
+                            variableIndices);
         generator.Generate(op);
         entryPoint = std::move(generator.operations);
     }
@@ -678,7 +739,7 @@ TNumber ExecuteStackMachineModule(
     }
 
     // Start execution
-    auto [operations, maxStackSizes] = module.FlattenOperations();
+    auto [operationsOriginal, maxStackSizes] = module.FlattenOperations();
     TStackArray stack(StackSize);
     TPtrStackArray ptrStack(PtrStackSize);
     TNumber* top = &*stack.begin();
@@ -686,50 +747,129 @@ TNumber ExecuteStackMachineModule(
     int* ptrTop = &*ptrStack.begin();
     auto& array = state.GetArraySource();
 
-    for (StackMachineOperation* op = &*operations.begin();; op++)
+#ifdef USE_COMPUTED_GOTO
+    // This dispatch table must be in the same order as the StackMachineOpcode definition
+    static const void* DispatchTable[] = {
+        &&COMPUTED_GOTO_LABEL_OF(Push),
+        &&COMPUTED_GOTO_LABEL_OF(Pop),
+        &&COMPUTED_GOTO_LABEL_OF(LoadConst),
+        &&COMPUTED_GOTO_LABEL_OF(LoadConstTable),
+        &&COMPUTED_GOTO_LABEL_OF(LoadArg),
+        &&COMPUTED_GOTO_LABEL_OF(StoreArg),
+        &&COMPUTED_GOTO_LABEL_OF(LoadVariable),
+        &&COMPUTED_GOTO_LABEL_OF(StoreVariable),
+        &&COMPUTED_GOTO_LABEL_OF(LoadArrayElement),
+        &&COMPUTED_GOTO_LABEL_OF(StoreArrayElement),
+        &&COMPUTED_GOTO_LABEL_OF(Input),
+        &&COMPUTED_GOTO_LABEL_OF(PrintChar),
+        &&COMPUTED_GOTO_LABEL_OF(Add),
+        &&COMPUTED_GOTO_LABEL_OF(Sub),
+        &&COMPUTED_GOTO_LABEL_OF(Mult),
+        &&COMPUTED_GOTO_LABEL_OF(Div),
+        &&COMPUTED_GOTO_LABEL_OF(DivChecked),
+        &&COMPUTED_GOTO_LABEL_OF(Mod),
+        &&COMPUTED_GOTO_LABEL_OF(Goto),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfEqual),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThan),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThanOrEqual),
+        &&COMPUTED_GOTO_LABEL_OF(Call),
+        &&COMPUTED_GOTO_LABEL_OF(Return),
+        &&COMPUTED_GOTO_LABEL_OF(Halt),
+        &&COMPUTED_GOTO_LABEL_OF(Lavel),
+    };
+
+    // Compute the target addresses of goto
+    ComputedGotoOperation operations[operationsOriginal.size()];
+    for (size_t i = 0; i < operationsOriginal.size(); i++)
     {
-        switch (op->opcode)
+        operations[i].address = DispatchTable[static_cast<size_t>(operationsOriginal[i].opcode)];
+        operations[i].value = operationsOriginal[i].value;
+    }
+    ComputedGotoOperation* op = operations;
+#else
+    StackMachineOperation* op = &*operationsOriginal.begin();
+    StackMachineOperation* operations = &*operationsOriginal.begin();
+#endif // USE_COMPUTED_GOTO
+
+    COMPUTED_GOTO_BEGIN();
+
+    COMPUTED_GOTO_SWITCH()
+    {
+        COMPUTED_GOTO_CASE(Push)
         {
-        case StackMachineOpcode::Push:
             *top = 0;
             top++;
-            break;
-        case StackMachineOpcode::Pop:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Pop)
+        {
             top--;
-            break;
-        case StackMachineOpcode::LoadConst:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(LoadConst)
+        {
             *top = static_cast<TNumber>(op->value);
             top++;
-            break;
-        case StackMachineOpcode::LoadConstTable:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(LoadConstTable)
+        {
             *top = module.GetConstTable()[op->value];
             top++;
-            break;
-        case StackMachineOpcode::LoadArg:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(LoadArg)
+        {
             *top = bottom[-op->value];
             top++;
-            break;
-        case StackMachineOpcode::StoreArg:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(StoreArg)
+        {
             top--;
             bottom[-op->value] = *top;
-            break;
-        case StackMachineOpcode::LoadVariable:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(LoadVariable)
+        {
             *top = variables[op->value];
             top++;
-            break;
-        case StackMachineOpcode::StoreVariable:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(StoreVariable)
+        {
             variables[op->value] = top[-1];
-            break;
-        case StackMachineOpcode::LoadArrayElement:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(LoadArrayElement)
+        {
             top[-1] = array.Get(top[-1]);
-            break;
-        case StackMachineOpcode::StoreArrayElement:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(StoreArrayElement)
+        {
             top--;
             array.Set(*top, top[-1]);
-            break;
-        case StackMachineOpcode::Input:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Input)
+        {
             throw "Not implemented";
-        case StackMachineOpcode::PrintChar:
+        }
+
+        COMPUTED_GOTO_CASE(PrintChar)
+        {
 #ifdef ENABLE_GMP
             if constexpr (std::is_same_v<TNumber, mpz_class>)
             {
@@ -741,59 +881,110 @@ TNumber ExecuteStackMachineModule(
                 state.PrintChar(static_cast<char>(top[-1]));
             }
             top[-1] = 0;
-            break;
-        case StackMachineOpcode::Add:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Add)
+        {
             top--;
             top[-1] = top[-1] + *top;
-            break;
-        case StackMachineOpcode::Sub:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Sub)
+        {
             top--;
             top[-1] = top[-1] - *top;
-            break;
-        case StackMachineOpcode::Mult:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Mult)
+        {
             top--;
             top[-1] = top[-1] * *top;
-            break;
-        case StackMachineOpcode::Div:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Div)
+        {
             top--;
             top[-1] = top[-1] / *top;
-            break;
-        case StackMachineOpcode::Mod:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(DivChecked)
+        {
+            // This block is required in order to ensure that the 'divisor' variable will be
+            // properly destructed before jumping by COMPUTED_GOTO_JUMP macro.
+            {
+                top--;
+
+                TNumber divisor = *top;
+                if (divisor == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
+
+                top[-1] = top[-1] / divisor;
+            }
+
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Mod)
+        {
             top--;
             top[-1] = top[-1] % *top;
-            break;
-        case StackMachineOpcode::Goto:
-            op = &operations[op->value];
-            break;
-        case StackMachineOpcode::GotoIfTrue:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Goto)
+        {
+            COMPUTED_GOTO_JUMP(op->value);
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfTrue)
+        {
             top--;
             if (*top != 0)
             {
-                op = &operations[op->value];
+                COMPUTED_GOTO_JUMP(op->value);
             }
-            break;
-        case StackMachineOpcode::GotoIfEqual:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfEqual)
+        {
             top -= 2;
             if (*top == top[1])
             {
-                op = &operations[op->value];
+                COMPUTED_GOTO_JUMP(op->value);
             }
-            break;
-        case StackMachineOpcode::GotoIfLessThan:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfLessThan)
+        {
             top -= 2;
             if (*top < top[1])
             {
-                op = &operations[op->value];
+                COMPUTED_GOTO_JUMP(op->value);
             }
-            break;
-        case StackMachineOpcode::GotoIfLessThanOrEqual:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfLessThanOrEqual)
+        {
             top -= 2;
             if (*top <= top[1])
             {
-                op = &operations[op->value];
+                COMPUTED_GOTO_JUMP(op->value);
             }
-            break;
-        case StackMachineOpcode::Call:
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(Call)
+        {
             // Check stack overflow
             if (top + maxStackSizes[op->value] >= &*stack.end())
             {
@@ -806,7 +997,7 @@ TNumber ExecuteStackMachineModule(
             }
 
             // Push current program counter
-            *ptrTop = static_cast<int>(std::distance(&*operations.begin(), op));
+            *ptrTop = static_cast<int>(std::distance(operations, op));
             ptrTop++;
 
             // Push current stack bottom
@@ -817,30 +1008,36 @@ TNumber ExecuteStackMachineModule(
             bottom = top;
 
             // Branch
-            op = &operations[op->value];
-            break;
-        case StackMachineOpcode::Return:
-        {
-            // Store returning value
-            TNumber valueToBeReturned = top[-1];
-
-            // Restore previous stack top while removing arguments from stack
-            // (We ensure space of returning value)
-            top = bottom - op->value + 1;
-
-            // Store returning value on stack
-            top[-1] = valueToBeReturned;
-
-            // Pop previous stack bottom
-            ptrTop--;
-            bottom = &*stack.begin() + *ptrTop;
-
-            // Pop previous program counter
-            ptrTop--;
-            op = &*operations.begin() + *ptrTop;
-            break;
+            COMPUTED_GOTO_JUMP(op->value);
         }
-        case StackMachineOpcode::Halt:
+
+        COMPUTED_GOTO_CASE(Return)
+        {
+            // This block is required in order to ensure that the 'valueToBeReturned' variable will
+            // be properly destructed before jumping by COMPUTED_GOTO_JUMP macro.
+            {
+                // Store returning value
+                TNumber valueToBeReturned = top[-1];
+
+                // Restore previous stack top while removing arguments from stack
+                // (We ensure space of returning value)
+                top = bottom - op->value + 1;
+
+                // Store returning value on stack
+                top[-1] = valueToBeReturned;
+
+                // Pop previous stack bottom
+                ptrTop--;
+                bottom = &*stack.begin() + *ptrTop;
+
+                // Pop previous program counter
+                ptrTop--;
+            }
+
+            COMPUTED_GOTO_JUMP(*ptrTop + 1);
+        }
+
+        COMPUTED_GOTO_CASE(Halt)
         {
             // Store variable's values to ExecutionState
             for (size_t i = 0; i < variables.size(); i++)
@@ -850,10 +1047,12 @@ TNumber ExecuteStackMachineModule(
 
             return top[-1];
         }
-        case StackMachineOpcode::Lavel:
-        default:
+
+        COMPUTED_GOTO_CASE(Lavel)
+        COMPUTED_GOTO_DEFAULT()
+        {
             UNREACHABLE();
-            break;
+            COMPUTED_GOTO_NEXT_OPERATION();
         }
     }
 }

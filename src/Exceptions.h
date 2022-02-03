@@ -156,6 +156,21 @@ private:
     }
 };
 
+class ZeroDivisionException : public Calc4Exception
+{
+public:
+    ZeroDivisionException(const std::optional<CharPosition>& position)
+        : Calc4Exception(position, CreateMessage())
+    {
+    }
+
+private:
+    static std::string CreateMessage()
+    {
+        return "Zero division";
+    }
+};
+
 class AssertionErrorException : public Calc4Exception
 {
 public:

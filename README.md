@@ -112,7 +112,7 @@ Another sample code is also available.
         git clone https://github.com/proprowataya/calc4.git
         mkdir calc4-build
         cd calc4-build
-        cmake ../calc4/src
+        cmake ../calc4
         cmake --build .
         ./calc4 ../calc4/sample/MandelbrotSet.txt
         ```
@@ -121,7 +121,7 @@ Another sample code is also available.
         git clone https://github.com/proprowataya/calc4.git
         mkdir calc4-build
         cd calc4-build
-        cmake ..\calc4\src
+        cmake ..\calc4
         cmake --build . --config Release
         .\Release\calc4.exe ..\calc4\sample\MandelbrotSet.txt
         ```
@@ -167,13 +167,13 @@ You can use the JIT compiler supported by LLVM. The steps to enable JIT compilat
 1. Build again with an option
     * Unix-like systems
         ```
-        cmake ../calc4/src -DENABLE_JIT=ON
+        cmake ../calc4 -DENABLE_JIT=ON
         cmake --build .
         ./calc4
         ```
     * Windows
         ```
-        cmake ..\calc4\src -DENABLE_JIT=ON
+        cmake ..\calc4 -DENABLE_JIT=ON
         cmake --build . --config Release
         .\Release\calc4.exe
         ```

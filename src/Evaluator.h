@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Exceptions.h"
 #include "ExecutionState.h"
 #include "Operators.h"
 
@@ -25,7 +26,7 @@ template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNum
          typename TPrinter = DefaultPrinter>
 TNumber Evaluate(const CompilationContext& context,
                  ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                 std::shared_ptr<const Operator>& op)
+                 const std::shared_ptr<const Operator>& op)
 {
     class Evaluator : public OperatorVisitor
     {
@@ -148,6 +149,10 @@ TNumber Evaluate(const CompilationContext& context,
                 value = left * right;
                 break;
             case BinaryType::Div:
+                if (right == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
                 value = left / right;
                 break;
             case BinaryType::Mod:
