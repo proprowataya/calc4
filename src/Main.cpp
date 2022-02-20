@@ -132,100 +132,101 @@ int main(int argc, char** argv)
 
 std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc, char** argv)
 {
+    using namespace std::string_literals;
+
     Option option;
     std::vector<const char*> sources;
     bool performTest = false;
+    bool warningsIntroduced = false;
+
+    auto ReportError = [argc, argv](std::string_view message) {
+        std::cout << "Error: " << message << std::endl << std::endl;
+        PrintHelp(argc, argv);
+        exit(EXIT_FAILURE);
+    };
+
+    auto ReportWarning = [&warningsIntroduced](std::string_view message) {
+        std::cout << "Warning: " << message << std::endl;
+        warningsIntroduced = true;
+    };
 
     for (int i = 1; i < argc; i++)
     {
         char* str = argv[i];
 
-        auto GetNextArgument = [&i, argc, argv]() {
+        auto GetNextArgument = [&i, argc, argv, ReportError]() {
             if (i + 1 >= argc)
             {
-                std::ostringstream oss;
-                oss << "Option \"" << argv[i] << "\" requires argument";
-                throw oss.str();
+                ReportError("Option \""s + argv[i] + "\" requires argument");
             }
 
             return argv[++i];
         };
 
-        try
+        if (str == CommandLineArgs::Help)
         {
-            if (str == CommandLineArgs::Help)
-            {
-                PrintHelp(argc, argv);
-                exit(0);
-            }
-            else if (str == CommandLineArgs::EnableJit)
-            {
+            PrintHelp(argc, argv);
+            exit(0);
+        }
+        else if (str == CommandLineArgs::EnableJit)
+        {
 #ifdef ENABLE_JIT
-                option.executorType = ExecutorType::JIT;
+            option.executorType = ExecutorType::JIT;
 #else
-                throw std::string("Jit compilation is not supported");
+            ReportError("Jit compilation is not supported");
 #endif // ENABLE_JIT
-            }
-            else if (str == CommandLineArgs::DisableJit)
-            {
-                option.executorType = ExecutorType::StackMachine;
-            }
-            else if (str == CommandLineArgs::NoUseTreeTraversalEvaluator)
-            {
-                option.treeExecutorMode = TreeTraversalExecutorMode::Never;
-            }
-            else if (str == CommandLineArgs::ForceTreeTraversalEvaluator)
-            {
-                option.treeExecutorMode = TreeTraversalExecutorMode::Always;
-            }
-            else if (str == CommandLineArgs::IntegerSize ||
-                     str == CommandLineArgs::IntegerSizeShort)
-            {
-                const char* arg = GetNextArgument();
-                int size;
+        }
+        else if (str == CommandLineArgs::DisableJit)
+        {
+            option.executorType = ExecutorType::StackMachine;
+        }
+        else if (str == CommandLineArgs::NoUseTreeTraversalEvaluator)
+        {
+            option.treeExecutorMode = TreeTraversalExecutorMode::Never;
+        }
+        else if (str == CommandLineArgs::ForceTreeTraversalEvaluator)
+        {
+            option.treeExecutorMode = TreeTraversalExecutorMode::Always;
+        }
+        else if (str == CommandLineArgs::IntegerSize || str == CommandLineArgs::IntegerSizeShort)
+        {
+            const char* arg = GetNextArgument();
+            int size;
 
-                if (arg == CommandLineArgs::InfinitePrecisionInteger)
-                {
+            if (arg == CommandLineArgs::InfinitePrecisionInteger)
+            {
 #ifdef ENABLE_GMP
-                    size = (option.integerSize = InfinitePrecisionIntegerSize);
+                size = (option.integerSize = InfinitePrecisionIntegerSize);
 #else
-                    throw std::string("Infinite precision integer is not supported");
+                ReportError("Infinite precision integer is not supported");
+                size = -1; /* Keep compiler silence */
 #endif // ENABLE_GMP
-                }
-                else
-                {
-                    size = (option.integerSize = atoi(arg));
-                }
-
-                if (!IsSupportedIntegerSize(size))
-                {
-                    std::ostringstream oss;
-                    oss << "Unsupported integer size " << option.integerSize;
-                    throw oss.str();
-                }
-            }
-            else if (str == CommandLineArgs::EnableOptimization)
-            {
-                option.optimize = true;
-            }
-            else if (str == CommandLineArgs::DisableOptimization)
-            {
-                option.optimize = false;
-            }
-            else if (str == CommandLineArgs::DumpProgram)
-            {
-                option.dumpProgram = true;
             }
             else
             {
-                sources.push_back(str);
+                size = (option.integerSize = atoi(arg));
+            }
+
+            if (!IsSupportedIntegerSize(size))
+            {
+                ReportError("Unsupported integer size \"" + std::string(arg) + '\"');
             }
         }
-        catch (std::string& error)
+        else if (str == CommandLineArgs::EnableOptimization)
         {
-            std::cout << "Error: " << error << std::endl << std::endl;
-            PrintHelp(argc, argv);
-            exit(EXIT_FAILURE);
+            option.optimize = true;
+        }
+        else if (str == CommandLineArgs::DisableOptimization)
+        {
+            option.optimize = false;
+        }
+        else if (str == CommandLineArgs::DumpProgram)
+        {
+            option.dumpProgram = true;
+        }
+        else
+        {
+            sources.push_back(str);
         }
     }
 
@@ -234,15 +235,19 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
         option.integerSize == InfinitePrecisionIntegerSize)
     {
         option.executorType = ExecutorType::StackMachine;
-        std::cout << "Warning: Jit compilation is disabled because it does not support infinite "
-                     "precision integers."
-                  << std::endl;
+        ReportWarning(
+            "Jit compilation is disabled because it does not support infinite precision integers.");
     }
 #endif // defined(ENABLE_JIT) && defined(ENABLE_GMP)
 
     if (option.treeExecutorMode == TreeTraversalExecutorMode::Always)
     {
         option.executorType = ExecutorType::TreeTraversal;
+    }
+
+    if (warningsIntroduced)
+    {
+        std::cout << std::endl;
     }
 
     return std::make_tuple(option, sources, performTest);
