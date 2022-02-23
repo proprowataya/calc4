@@ -7,6 +7,7 @@
  *
  *****/
 
+#include "CppEmitter.h"
 #include "Evaluator.h"
 #include "Exceptions.h"
 #include "Operators.h"
@@ -50,6 +51,7 @@ constexpr std::string_view IntegerSizeShort = "-s";
 constexpr std::string_view EnableOptimization = "-O1";
 constexpr std::string_view DisableOptimization = "-O0";
 constexpr std::string_view InfinitePrecisionInteger = "inf";
+constexpr std::string_view EmitCpp = "--emit-cpp";
 constexpr std::string_view DumpProgram = "--dump";
 }
 
@@ -220,6 +222,10 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
         {
             option.optimize = false;
         }
+        else if (str == CommandLineArgs::EmitCpp)
+        {
+            option.emitCpp = true;
+        }
         else if (str == CommandLineArgs::DumpProgram)
         {
             option.dumpProgram = true;
@@ -229,6 +235,33 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
             sources.push_back(str);
         }
     }
+
+    if (sources.empty() && option.emitCpp)
+    {
+        ReportWarning('\"' + std::string(CommandLineArgs::EmitCpp) +
+                      "\" option was specified, but it will be ignored in the repl mode.");
+        option.emitCpp = false;
+    }
+
+#if defined(ENABLE_INT128) || defined(ENABLE_GMP)
+    if (option.emitCpp &&
+        (
+#ifdef ENABLE_INT128
+            option.integerSize == 128
+#endif // ENABLE_INT128
+
+#if defined(ENABLE_INT128) && defined(ENABLE_GMP)
+            ||
+#endif // defined(ENABLE_INT128) && defined(ENABLE_GMP)
+
+#ifdef ENABLE_GMP
+            option.integerSize == InfinitePrecisionIntegerSize
+#endif // ENABLE_GMP
+            ))
+    {
+        ReportError("C++ code generation is not supported for the specified integer size.");
+    }
+#endif // defined(ENABLE_JIT) && defined(ENABLE_GMP)
 
 #if defined(ENABLE_JIT) && defined(ENABLE_GMP)
     if (option.executorType == ExecutorType::JIT &&
@@ -437,6 +470,8 @@ void PrintHelp(int argc, char** argv)
          << endl
          << CommandLineArgs::ForceTreeTraversalEvaluator << endl
          << Indent << "Always use the tree traversal executors (very slow)" << endl
+         << CommandLineArgs::EmitCpp << endl
+         << Indent << "Emit C++ code for source input (experimental feature)" << endl
          << CommandLineArgs::DumpProgram << endl
          << Indent << "Dump the given program's structures such as an abstract syntax tree" << endl
          << endl
