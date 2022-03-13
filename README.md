@@ -2,6 +2,12 @@
 
 Calc4 is a programming language where everything in its code is an operator.
 
+## Try It Out
+
+To try Calc4 via your web browser, please visit [Try Calc4](https://proprowataya.github.io/calc4/). This website allows you to run the Calc4 source code you type on the fly.
+
+## Overview
+
 The design of Calc4 is inspired by calculators. Calc4 allows you to program as if you were pressing the calculator's buttons. First of all, look at the next examples of Calc4 programs.
 
 * Arithmetic operation
@@ -85,6 +91,8 @@ Another sample code is also available.
 * [Printing prime numbers up to 100](sample/PrintPrimes.txt)
 
 ## Getting Started
+
+If you wish to simply try Calc4, the [Try Calc4](https://proprowataya.github.io/calc4/) website is the best choice. Below are the steps to build a native Calc4 environment.
 
 ### Requirements
 
