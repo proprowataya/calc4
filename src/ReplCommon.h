@@ -22,6 +22,7 @@
 
 #include <chrono>
 #include <exception>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <unordered_map>
@@ -72,6 +73,7 @@ struct Option
     bool optimize = true;
     bool checkZeroDivision = true;
     bool dumpProgram = false;
+    bool emitCpp = false;
 };
 
 /*****
@@ -337,12 +339,30 @@ void ExecuteSource(std::string_view source, const char* filePath, CompilationCon
             PrintTree(context, op, out);
         }
 
-        TNumber result = ExecuteOperator(op, context, state, option, out);
-        auto end = chrono::high_resolution_clock::now();
+        if (option.emitCpp)
+        {
+            assert(filePath != nullptr);
 
-        out << result << endl
-            << "Elapsed: " << (chrono::duration<double>(end - start).count() * 1000) << " ms"
-            << endl;
+            std::string outputFilePath = filePath;
+            auto index = outputFilePath.find_last_of('.');
+            if (index != std::string_view::npos)
+            {
+                outputFilePath.erase(index);
+            }
+            outputFilePath += ".cpp";
+
+            std::ofstream ofs(outputFilePath);
+            EmitCppCode<TNumber>(op, context, ofs);
+        }
+        else
+        {
+            TNumber result = ExecuteOperator(op, context, state, option, out);
+            auto end = chrono::high_resolution_clock::now();
+
+            out << result << endl
+                << "Elapsed: " << (chrono::duration<double>(end - start).count() * 1000) << " ms"
+                << endl;
+        }
     }
     catch (Exceptions::Calc4Exception& error)
     {
