@@ -10,6 +10,8 @@
 #include "Common.h"
 
 #ifdef ENABLE_INT128
+namespace std
+{
 // https://stackoverflow.com/questions/25114597/how-to-print-int128-in-g
 std::ostream& operator<<(std::ostream& dest, __int128_t value)
 {
@@ -42,6 +44,7 @@ std::ostream& operator<<(std::ostream& dest, __int128_t value)
     }
 
     return dest;
+}
 }
 #endif // ENABLE_INT128
 

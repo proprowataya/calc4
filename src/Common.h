@@ -28,7 +28,10 @@
 #endif // !NDEBUG
 
 #ifdef ENABLE_INT128
+namespace std
+{
 std::ostream& operator<<(std::ostream& dest, __int128_t value);
+}
 #endif // ENABLE_INT128
 
 namespace calc4
