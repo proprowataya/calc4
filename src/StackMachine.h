@@ -38,6 +38,7 @@ enum class StackMachineOpcode : int8_t
     Div,
     DivChecked,
     Mod,
+    ModChecked,
     Goto,
     GotoIfTrue,
     GotoIfEqual,

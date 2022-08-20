@@ -156,6 +156,10 @@ TNumber Evaluate(const CompilationContext& context,
                 value = left / right;
                 break;
             case BinaryType::Mod:
+                if (right == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
                 value = left % right;
                 break;
             case BinaryType::Equal:

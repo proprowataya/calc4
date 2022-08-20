@@ -442,7 +442,8 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                                                       : StackMachineOpcode::Div);
                 break;
             case BinaryType::Mod:
-                AddOperation(StackMachineOpcode::Mod);
+                AddOperation(option.checkZeroDivision ? StackMachineOpcode::ModChecked
+                                                      : StackMachineOpcode::Mod);
                 break;
             case BinaryType::Equal:
                 EmitComparisonBranch(StackMachineOpcode::GotoIfEqual, false);
@@ -612,6 +613,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             case StackMachineOpcode::Div:
             case StackMachineOpcode::DivChecked:
             case StackMachineOpcode::Mod:
+            case StackMachineOpcode::ModChecked:
             case StackMachineOpcode::GotoIfTrue:
             case StackMachineOpcode::Return:
             case StackMachineOpcode::Halt:
@@ -768,6 +770,7 @@ TNumber ExecuteStackMachineModule(
         &&COMPUTED_GOTO_LABEL_OF(Div),
         &&COMPUTED_GOTO_LABEL_OF(DivChecked),
         &&COMPUTED_GOTO_LABEL_OF(Mod),
+        &&COMPUTED_GOTO_LABEL_OF(ModChecked),
         &&COMPUTED_GOTO_LABEL_OF(Goto),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfEqual),
@@ -935,6 +938,25 @@ TNumber ExecuteStackMachineModule(
         {
             top--;
             top[-1] = top[-1] % *top;
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(ModChecked)
+        {
+            // This block is required in order to ensure that the 'divisor' variable will be
+            // properly destructed before jumping by COMPUTED_GOTO_JUMP macro.
+            {
+                top--;
+
+                TNumber divisor = *top;
+                if (divisor == 0)
+                {
+                    throw Exceptions::ZeroDivisionException(std::nullopt);
+                }
+
+                top[-1] = top[-1] % divisor;
+            }
+
             COMPUTED_GOTO_NEXT_OPERATION();
         }
 

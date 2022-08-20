@@ -149,7 +149,8 @@ public:
         TNumber leftValue, rightValue;
         if (TryGetPrecomputedValue(left, &leftValue) &&
             TryGetPrecomputedValue(right, &rightValue) &&
-            !(op->GetType() == BinaryType::Div && rightValue == 0))
+            !((op->GetType() == BinaryType::Div || op->GetType() == BinaryType::Mod) &&
+              rightValue == 0))
         {
             TNumber result;
 

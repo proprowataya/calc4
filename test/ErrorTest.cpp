@@ -68,6 +68,26 @@ ErrorTestCaseBase ErrorTestCaseBases[] = {
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
+    { "1%0", CreateValidator<ZeroDivisionException>(),
+      [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
+          return checkZeroDivision;
+      } },
+    { "1%(10 - 10)", CreateValidator<ZeroDivisionException>(),
+      [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
+          return checkZeroDivision;
+      } },
+    { "1%L", CreateValidator<ZeroDivisionException>(),
+      [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
+          return checkZeroDivision;
+      } },
+    { "1%(123@)", CreateValidator<ZeroDivisionException>(),
+      [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
+          return checkZeroDivision;
+      } },
+    { "D[getzero||0] 1%{getzero}", CreateValidator<ZeroDivisionException>(),
+      [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
+          return checkZeroDivision;
+      } },
 #endif // !_MSC_VER
     // clang-format on
 };
