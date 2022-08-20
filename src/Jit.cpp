@@ -437,7 +437,10 @@ public:
             this->value = this->builder->CreateMul(left, right);
             break;
         case BinaryType::Div:
+        case BinaryType::Mod:
         {
+            // We share the same logic among Div and Mod operations
+
             if (this->option.checkZeroDivision)
             {
                 llvm::BasicBlock* whenDivisorIsZero =
@@ -466,12 +469,17 @@ public:
                 this->builder = std::move(divisionCoreBuilder);
             }
 
-            this->value = this->builder->CreateSDiv(left, right);
+            if (op->GetType() == BinaryType::Div)
+            {
+                this->value = this->builder->CreateSDiv(left, right);
+            }
+            else
+            {
+                this->value = this->builder->CreateSRem(left, right);
+            }
+
             break;
         }
-        case BinaryType::Mod:
-            this->value = this->builder->CreateSRem(left, right);
-            break;
         case BinaryType::Equal:
         {
             auto cmp = this->builder->CreateICmpEQ(left, right);
