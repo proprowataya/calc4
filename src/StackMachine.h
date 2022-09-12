@@ -185,6 +185,8 @@ inline constexpr const char* ToString(StackMachineOpcode opcode)
         return "DivChecked";
     case StackMachineOpcode::Mod:
         return "Mod";
+    case StackMachineOpcode::ModChecked:
+        return "ModChecked";
     case StackMachineOpcode::Goto:
         return "Goto";
     case StackMachineOpcode::GotoIfTrue:

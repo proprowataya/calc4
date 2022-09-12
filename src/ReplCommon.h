@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "CppEmitter.h"
 #include "Evaluator.h"
 #include "Exceptions.h"
 #include "Operators.h"

@@ -7,18 +7,7 @@
  *
  *****/
 
-#include "CppEmitter.h"
-#include "Evaluator.h"
-#include "Exceptions.h"
-#include "Operators.h"
-#include "Optimizer.h"
 #include "ReplCommon.h"
-#include "StackMachine.h"
-#include "SyntaxAnalysis.h"
-
-#ifdef ENABLE_JIT
-#include "Jit.h"
-#endif // ENABLE_JIT
 
 #include <chrono>
 #include <cstdint>
