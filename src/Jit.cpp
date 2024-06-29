@@ -154,7 +154,7 @@ TNumber EvaluateByJIT(const CompilationContext& context,
         }
 
         // Optimize this module
-        ModulePassManager MPM = PB.buildModuleOptimizationPipeline(OptLevel, LTOPhase);
+        ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(OptLevel);
         MPM.run(*M, MAM);
     }
 
