@@ -159,7 +159,7 @@ Elapsed: 1457.58 ms
 
 You can use the JIT compiler supported by LLVM. The steps to enable JIT compilation are as follows.
 
-1. Install [LLVM](https://llvm.org/) (>= 5.0)
+1. Install [LLVM](https://llvm.org/)
     * apt
         ```
         sudo apt update
