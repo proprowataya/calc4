@@ -33,12 +33,12 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "Exceptions.h"
 #include "Jit.h"
@@ -123,27 +123,39 @@ TNumber EvaluateByJIT(const CompilationContext& context,
     /* ***** Optimize ***** */
     if (option.optimize)
     {
-        static constexpr int OptLevel = 3, SizeLevel = 0;
+        static const OptimizationLevel& OptLevel = OptimizationLevel::O3;
+        static constexpr ThinOrFullLTOPhase LTOPhase = ThinOrFullLTOPhase::None;
 
-        legacy::PassManager PM;
-        legacy::FunctionPassManager FPM(M);
-        PassManagerBuilder PMB;
-        PMB.OptLevel = OptLevel;
-        PMB.SizeLevel = SizeLevel;
-#if LLVM_VERSION_MAJOR >= 5
-        PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel, false);
-#else
-        PMB.Inliner = createFunctionInliningPass(OptLevel, SizeLevel);
-#endif //  LLVM_VERSION_MAJOR >= 5
-        PMB.populateFunctionPassManager(FPM);
-        PMB.populateModulePassManager(PM);
+        // Prepare PassBuilder
+        PassBuilder PB;
+        LoopAnalysisManager LAM;
+        FunctionAnalysisManager FAM;
+        CGSCCAnalysisManager CGAM;
+        ModuleAnalysisManager MAM;
+        PB.registerModuleAnalyses(MAM);
+        PB.registerCGSCCAnalyses(CGAM);
+        PB.registerFunctionAnalyses(FAM);
+        PB.registerLoopAnalyses(LAM);
+        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-        for (auto& func : *M)
+        // We have to make a copy of M->functions because new functions may be added during
+        // optimization.
+        std::vector<Function*> functions;
+        for (auto& func : M->functions())
         {
-            FPM.run(func);
+            functions.emplace_back(&func);
         }
 
-        PM.run(*M);
+        // Optimize each function
+        FunctionPassManager FPM = PB.buildFunctionSimplificationPipeline(OptLevel, LTOPhase);
+        for (auto func : functions)
+        {
+            FPM.run(*func, FAM);
+        }
+
+        // Optimize this module
+        ModulePassManager MPM = PB.buildModuleOptimizationPipeline(OptLevel, LTOPhase);
+        MPM.run(*M, MAM);
     }
 
     if (option.dumpProgram)
