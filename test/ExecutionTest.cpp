@@ -81,6 +81,10 @@ ExecutionTestCaseBase ExecutionTestCaseBases[] = {
     { "D[func||((4+6)->(10+10))(20@)] {func} (20@)", "", 10, nullptr, {}, { { 20, 10 } } },
     { "D[func||(10->20)L[zero]20@] D[get||20@] {func} (20@)", "", 10, nullptr, {}, { { 20, 10 } } },
     { "D[func||((4+6)->(10+10))(20@)] D[get||20@] {func} {get}", "", 10, nullptr, {}, { { 20, 10 } } },
+    { "I", "A", 65 },
+    { "I+I", "AB", 131 },
+    { "1+2+I", "A", 68 },
+    { "D[Input||I]{Input}", "A", 65 },
     // clang-format on
 };
 
