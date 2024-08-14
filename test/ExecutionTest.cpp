@@ -85,6 +85,7 @@ ExecutionTestCaseBase ExecutionTestCaseBases[] = {
     { "I+I", "AB", 131 },
     { "1+2+I", "A", 68 },
     { "D[Input||I]{Input}", "A", 65 },
+    { "I", "", -1 },
     // clang-format on
 };
 

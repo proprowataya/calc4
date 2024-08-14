@@ -581,9 +581,9 @@ void EmitCppCode(const std::shared_ptr<const Operator>& op, const CompilationCon
     ostream << "std::unordered_map<" << TypeName<TNumber>() << ", " << TypeName<TNumber>() << "> "
             << MemoryFieldName() << ';' << std::endl;
     ostream << std::endl;
-    ostream << "char " << GetCharFunctionName() << "()" << std::endl;
+    ostream << "int " << GetCharFunctionName() << "()" << std::endl;
     ostream << "{" << std::endl;
-    ostream << IndentText << "return static_cast<char>(std::cin.get());" << std::endl;
+    ostream << IndentText << "return std::cin.get();" << std::endl;
     ostream << "}" << std::endl;
     ostream << std::endl;
     ostream << "void " << PrintFunctionName() << "(" << TypeName<TNumber>() << " value)"

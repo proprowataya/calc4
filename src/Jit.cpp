@@ -94,7 +94,7 @@ void ThrowZeroDivisionException(void* state);
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
          typename TInputSource, typename TPrinter>
-char GetChar(void* state);
+int GetChar(void* state);
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
          typename TInputSource, typename TPrinter>
@@ -320,7 +320,7 @@ public:
         throwZeroDivision = GET_INTERNAL_FUNCTION(
             ThrowZeroDivisionException, llvm::Type::getVoidTy(*this->context), { voidPointerType });
 
-        getChar = GET_INTERNAL_FUNCTION(GetChar, this->builder->getInt8Ty(), { voidPointerType });
+        getChar = GET_INTERNAL_FUNCTION(GetChar, this->builder->getInt32Ty(), { voidPointerType });
         printChar = GET_INTERNAL_FUNCTION(PrintChar, llvm::Type::getVoidTy(*this->context),
                                           { voidPointerType, this->builder->getInt8Ty() });
         loadVariable =
@@ -395,8 +395,15 @@ public:
     {
         auto character = CallInternalFunction(this->getChar, { &*this->function->arg_begin() },
                                               this->builder.get());
-        this->value =
-            this->builder->CreateSExt(character, this->builder->getIntNTy(IntegerBits<TNumber>));
+        if (this->GetIntegerType()->isIntegerTy(IntegerBits<int>))
+        {
+            this->value = character;
+        }
+        else
+        {
+            this->value = this->builder->CreateSExt(character,
+                                                    this->builder->getIntNTy(IntegerBits<TNumber>));
+        }
     };
 
     virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
@@ -666,7 +673,7 @@ void ThrowZeroDivisionException(void* state)
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
          typename TInputSource, typename TPrinter>
-char GetChar(void* state)
+int GetChar(void* state)
 {
     return reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource,
                                            TInputSource, TPrinter>*>(state)

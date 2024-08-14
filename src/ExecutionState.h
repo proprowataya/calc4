@@ -29,9 +29,11 @@ class DefaultGlobalArraySource;
 
 struct DefaultInputSource
 {
-    char operator()() const
+    int operator()() const
     {
-        return static_cast<char>(std::cin.get());
+        static_assert(std::is_same_v<decltype(std::cin.get()), int>);
+        static_assert(std::char_traits<char>::eof() == -1);
+        return std::cin.get();
     }
 };
 
@@ -44,25 +46,17 @@ private:
 public:
     BufferedInputSource(std::string_view buffer) : buffer(buffer), nextIndex(0) {}
 
-    char operator()()
+    int operator()()
     {
         size_t index = nextIndex;
 
         if (index < buffer.length())
         {
             nextIndex++;
-            return buffer[index];
+            return static_cast<int>(buffer[index]);
         }
 
-        return static_cast<char>(0);
-    }
-};
-
-struct DefaultPrinter
-{
-    void operator()(char c) const
-    {
-        std::cout << c;
+        return -1;
     }
 };
 
@@ -74,9 +68,19 @@ private:
 public:
     StreamInputSource(std::istream* stream) : stream(stream) {}
 
-    char operator()()
+    int operator()() const
     {
-        return static_cast<char>(stream->get());
+        static_assert(std::is_same_v<decltype(stream->get()), int>);
+        static_assert(std::char_traits<char>::eof() == -1);
+        return stream->get();
+    }
+};
+
+struct DefaultPrinter
+{
+    void operator()(char c) const
+    {
+        std::cout << c;
     }
 };
 
@@ -147,7 +151,7 @@ public:
         return arraySource;
     }
 
-    char GetChar()
+    int GetChar()
     {
         return inputSource();
     }
