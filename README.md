@@ -427,6 +427,35 @@ You can use the JIT compiler supported by LLVM. The steps to enable JIT compilat
 * The negative indices are also allowed.
 * The parentheses in the above code are required. If they are missing, the code will be interpreted as ```123->1010@```. This incomprehensible behavior is due to the handling of line breaks, which should be reconsidered in the future.
 
+### Input Operators
+
+* Calc4 Sample Code
+    ```
+    I
+    ```
+* Equivalent to
+    ```c
+    return getchar();
+    ```
+* Standard Input
+    ```
+    A
+    ```
+* Result
+    ```
+    > I
+    A
+    65
+    Elapsed: 633.161 ms
+    ```
+* The operator ```I``` reads a character from standard input and returns it. In the above example, the user pressed the "A" key and the program displays 65, an ASCII code for "A".
+* [A sample calculator program](./sample/calculator.txt) uses this feature. The program reads an expression from standard input and prints the result.
+    * Usage
+        ```
+        $ echo "1 + 2 * 3" | calc4 calculator.txt
+        7
+        ```
+
 ### Tarai Function
 
 [Tarai function](https://en.wikipedia.org/wiki/Tak_(function)) is often used when benchmarking programming languages.
