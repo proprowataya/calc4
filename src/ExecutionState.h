@@ -27,11 +27,56 @@ class DefaultVariableSource;
 template<typename TNumber>
 class DefaultGlobalArraySource;
 
+struct DefaultInputSource
+{
+    char operator()() const
+    {
+        return static_cast<char>(std::cin.get());
+    }
+};
+
+struct BufferedInputSource
+{
+private:
+    std::string_view buffer;
+    size_t nextIndex;
+
+public:
+    BufferedInputSource(std::string_view buffer) : buffer(buffer), nextIndex(0) {}
+
+    char operator()()
+    {
+        size_t index = nextIndex;
+
+        if (index < buffer.length())
+        {
+            nextIndex++;
+            return buffer[index];
+        }
+
+        return static_cast<char>(0);
+    }
+};
+
 struct DefaultPrinter
 {
     void operator()(char c) const
     {
         std::cout << c;
+    }
+};
+
+struct StreamInputSource
+{
+private:
+    std::istream* stream;
+
+public:
+    StreamInputSource(std::istream* stream) : stream(stream) {}
+
+    char operator()()
+    {
+        return static_cast<char>(stream->get());
     }
 };
 
@@ -65,18 +110,22 @@ public:
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter>
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
 class ExecutionState
 {
 private:
     TVariableSource variableSource;
     TGlobalArraySource arraySource;
+    TInputSource inputSource;
     TPrinter printer;
 
 public:
     ExecutionState() {}
 
-    ExecutionState(TPrinter printer) : printer(printer) {}
+    ExecutionState(TInputSource inputSource, TPrinter printer)
+        : inputSource(inputSource), printer(printer)
+    {
+    }
 
     TVariableSource& GetVariableSource()
     {
@@ -96,6 +145,11 @@ public:
     const TGlobalArraySource& GetArraySource() const
     {
         return arraySource;
+    }
+
+    char GetChar()
+    {
+        return inputSource();
     }
 
     void PrintChar(char c) const

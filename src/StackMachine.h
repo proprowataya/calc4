@@ -218,9 +218,9 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter, typename TStackArray = std::vector<TNumber>,
-         typename TPtrStackArray = std::vector<int>>
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter,
+         typename TStackArray = std::vector<TNumber>, typename TPtrStackArray = std::vector<int>>
 TNumber ExecuteStackMachineModule(
     const StackMachineModule<TNumber>& module,
-    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state);
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state);
 }

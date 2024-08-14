@@ -258,10 +258,10 @@ std::shared_ptr<const Operator> SyntaxAnalysis(std::string_view source, const ch
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter>
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
 TNumber ExecuteOperator(
     const std::shared_ptr<const Operator>& op, const CompilationContext& context,
-    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
     const Option& option, std::ostream& out)
 {
     // Determine actual executor
@@ -315,10 +315,11 @@ TNumber ExecuteOperator(
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter>
-void ExecuteSource(std::string_view source, const char* filePath, CompilationContext& context,
-                   ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                   const Option& option, std::ostream& out)
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
+void ExecuteSource(
+    std::string_view source, const char* filePath, CompilationContext& context,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const Option& option, std::ostream& out)
 {
     using namespace std;
 

@@ -17,6 +17,7 @@ using namespace calc4::Exceptions;
 struct ErrorTestCaseBase
 {
     const char* input;
+    const char* standardInput;
     std::function<bool(const Calc4Exception&)> exceptionValidator;
     std::function<bool(IntegerType, ExecutorType, bool /* optimize*/, bool /* checkZeroDivision */)>
         enableThisTest;
@@ -37,54 +38,54 @@ std::function<bool(IntegerType, ExecutorType, bool, bool)> EnableAllConfiguratio
 
 ErrorTestCaseBase ErrorTestCaseBases[] = {
     // clang-format off
-    { "{notdefined}", CreateValidator<OperatorOrOperandNotDefinedException>(), EnableAllConfigurations() },
-    { "D[op|x, y]", CreateValidator<DefinitionTextNotSplittedProperlyException>(), EnableAllConfigurations() },
-    { "1+", CreateValidator<SomeOperandsMissingException>(), EnableAllConfigurations() },
-    { "(1+2", CreateValidator<TokenExpectedException>(), EnableAllConfigurations() },
-    { "1+2)", CreateValidator<UnexpectedTokenException>(), EnableAllConfigurations() },
-    { "", CreateValidator<CodeIsEmptyException>(), EnableAllConfigurations() },
-    { "D[x||{x}] {x}", CreateValidator<StackOverflowException>(),
+    { "{notdefined}", "", CreateValidator<OperatorOrOperandNotDefinedException>(), EnableAllConfigurations() },
+    { "D[op|x, y]", "", CreateValidator<DefinitionTextNotSplittedProperlyException>(), EnableAllConfigurations() },
+    { "1+", "", CreateValidator<SomeOperandsMissingException>(), EnableAllConfigurations() },
+    { "(1+2", "", CreateValidator<TokenExpectedException>(), EnableAllConfigurations() },
+    { "1+2)", "", CreateValidator<UnexpectedTokenException>(), EnableAllConfigurations() },
+    { "", "", CreateValidator<CodeIsEmptyException>(), EnableAllConfigurations() },
+    { "D[x||{x}] {x}", "", CreateValidator<StackOverflowException>(),
       [](IntegerType, ExecutorType executor, bool optimize, bool) {
           return !optimize && executor == ExecutorType::StackMachine;
       } },
 #ifndef _MSC_VER
-    { "1/0", CreateValidator<ZeroDivisionException>(),
+    { "1/0", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1/(10 - 10)", CreateValidator<ZeroDivisionException>(),
+    { "1/(10 - 10)", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1/L", CreateValidator<ZeroDivisionException>(),
+    { "1/L", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1/(123@)", CreateValidator<ZeroDivisionException>(),
+    { "1/(123@)", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "D[getzero||0] 1/{getzero}", CreateValidator<ZeroDivisionException>(),
+    { "D[getzero||0] 1/{getzero}", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1%0", CreateValidator<ZeroDivisionException>(),
+    { "1%0", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1%(10 - 10)", CreateValidator<ZeroDivisionException>(),
+    { "1%(10 - 10)", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1%L", CreateValidator<ZeroDivisionException>(),
+    { "1%L", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "1%(123@)", CreateValidator<ZeroDivisionException>(),
+    { "1%(123@)", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
-    { "D[getzero||0] 1%{getzero}", CreateValidator<ZeroDivisionException>(),
+    { "D[getzero||0] 1%{getzero}", "", CreateValidator<ZeroDivisionException>(),
       [](IntegerType, ExecutorType executor, bool, bool checkZeroDivision) {
           return checkZeroDivision;
       } },
@@ -107,7 +108,8 @@ void OperateOneErrorTest(const ErrorTestCase& test)
 
     try
     {
-        Execute<TNumber>(test.input, test.optimize, test.checkZeroDivision, test.executorType);
+        Execute<TNumber>(test.input, test.standardInput, test.optimize, test.checkZeroDivision,
+                         test.executorType);
         FAIL();
     }
     catch (Calc4Exception& e)

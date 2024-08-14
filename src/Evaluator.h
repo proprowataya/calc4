@@ -23,23 +23,25 @@ namespace calc4
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter>
-TNumber Evaluate(const CompilationContext& context,
-                 ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                 const std::shared_ptr<const Operator>& op)
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
+TNumber Evaluate(
+    const CompilationContext& context,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const std::shared_ptr<const Operator>& op)
 {
     class Evaluator : public OperatorVisitor
     {
     private:
         const CompilationContext* context;
-        ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>* state;
+        ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>* state;
         std::stack<TNumber*> arguments;
 
     public:
         TNumber value;
 
         Evaluator(const CompilationContext* context,
-                  ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>* state)
+                  ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource,
+                                 TPrinter>* state)
             : context(context), state(state)
         {
         }

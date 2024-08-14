@@ -120,8 +120,8 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
 }
 
 template<typename TNumber>
-ExecutionResult<TNumber> Execute(const char* source, bool optimize, bool checkZeroDivision,
-                                 ExecutorType executor)
+ExecutionResult<TNumber> Execute(const char* source, const char* standardInput, bool optimize,
+                                 bool checkZeroDivision, ExecutorType executor)
 {
     using namespace calc4;
 
@@ -135,10 +135,11 @@ ExecutionResult<TNumber> Execute(const char* source, bool optimize, bool checkZe
 
     TNumber result;
     std::string consoleOutput;
+    BufferedInputSource inputSource(standardInput);
     BufferedPrinter printer(&consoleOutput);
     ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>,
-                   BufferedPrinter>
-        state(printer);
+                   BufferedInputSource, BufferedPrinter>
+        state(inputSource, printer);
 
     switch (executor)
     {
