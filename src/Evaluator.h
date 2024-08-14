@@ -71,6 +71,11 @@ TNumber Evaluate(
             value = state->GetVariableSource().Get(op->GetVariableName());
         };
 
+        virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+        {
+            value = static_cast<TNumber>(state->GetChar());
+        };
+
         virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
         {
             op->GetIndex()->Accept(*this);

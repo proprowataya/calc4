@@ -356,6 +356,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                          GetOrCreateVariableIndex(op->GetVariableName()));
         };
 
+        virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+        {
+            AddOperation(StackMachineOpcode::Input, 0);
+        };
+
         virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
         {
             op->GetIndex()->Accept(*this);
@@ -868,7 +873,9 @@ TNumber ExecuteStackMachineModule(
 
         COMPUTED_GOTO_CASE(Input)
         {
-            throw "Not implemented";
+            *top = static_cast<TNumber>(state.GetChar());
+            top++;
+            COMPUTED_GOTO_NEXT_OPERATION();
         }
 
         COMPUTED_GOTO_CASE(PrintChar)
