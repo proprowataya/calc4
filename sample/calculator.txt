@@ -28,9 +28,9 @@ D[PopOperators|op|(((((L[opIndex] - 1) < {OperatorOrigin}) {or} (({op} / 100 / {
                      ((L[outputIndex] + 1)S[outputIndex])
                      ((L[opIndex] - 1)S[opIndex])
                      ({op}{PopOperators})))]
-D[Parse||(((L == 0) {or} (L == 10) {or} (L == 13)) ? 0 ?
+D[Parse||(((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? 0 ?
          ((IS)
-          (((L == 0) {or} (L == 10) {or} (L == 13)) ? (((L[outputIndex] + 1)S[outputIndex])(0{PopOperators})((L[outputIndex] - 1)S[outputIndex])) ?
+          (((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? (((L[outputIndex] + 1)S[outputIndex])(0{PopOperators})((L[outputIndex] - 1)S[outputIndex])) ?
           ((((L >= 48) {and} (L <= 57)) ? ((L[outputIndex]@ * 10 + (L - 48))->L[outputIndex]) ?
            ((L == 32) ? 0 ?
            ((L == 40) ? ((0->L[opIndex])((L[opIndex] + 1)S[opIndex])({Parse})) ?
@@ -54,7 +54,7 @@ D[Execute||L[executeIndex]@ < {OperatorMask} ? (L[executeIndex]@S)((L[executeInd
 
 ({OutputOrigin}S[outputIndex])
 ({OperatorOrigin}S[opIndex])
-(0 - 1)S
+(0 - 2)S
 ({Parse})
 (L[outputIndex]S[executeIndex])
 ({Execute})
