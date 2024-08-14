@@ -1008,12 +1008,12 @@ TNumber ExecuteStackMachineModule(
         COMPUTED_GOTO_CASE(Call)
         {
             // Check stack overflow
-            if (top + maxStackSizes[op->value] >= &*stack.end())
+            if (top + maxStackSizes[op->value] >= &*stack.begin() + stack.size())
             {
                 throw Exceptions::StackOverflowException(std::nullopt);
             }
 
-            if (ptrTop + 2 >= &*ptrStack.end())
+            if (ptrTop + 2 >= &*ptrStack.begin() + ptrStack.size())
             {
                 throw Exceptions::StackOverflowException(std::nullopt);
             }
