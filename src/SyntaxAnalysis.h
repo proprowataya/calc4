@@ -297,6 +297,28 @@ public:
     MAKE_GET_NUM_OPERANDS(1)
 };
 
+class InputToken : public Token
+{
+private:
+    std::string supplementaryText;
+
+public:
+    InputToken(const CharPosition& position, const std::string& supplementaryText)
+        : Token(position), supplementaryText(supplementaryText)
+    {
+    }
+
+    virtual std::shared_ptr<const Operator> CreateOperator(
+        const std::vector<std::shared_ptr<const Operator>>& operands,
+        CompilationContext& context) const override
+    {
+        return InputOperator::Create();
+    }
+
+    MAKE_GET_SUPPLEMENTARY_TEXT;
+    MAKE_GET_NUM_OPERANDS(0)
+};
+
 class BinaryOperatorToken : public Token
 {
 private:

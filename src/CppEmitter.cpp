@@ -76,6 +76,11 @@ constexpr std::string_view PrintFunctionName()
     return "Print"sv;
 }
 
+constexpr std::string_view GetCharFunctionName()
+{
+    return "GetChar"sv;
+}
+
 template<typename TNumber>
 constexpr std::string_view TypeName()
 {
@@ -248,6 +253,14 @@ public:
     {
         AppendVariableDeclarationBegin();
         os << UserDefinedVariableName(op->GetVariableName());
+        AppendVariableDeclarationEnd();
+        Return();
+    };
+
+    virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+    {
+        AppendVariableDeclarationBegin();
+        os << "static_cast<" << TypeName<TNumber>() << ">(" << GetCharFunctionName() << "())";
         AppendVariableDeclarationEnd();
         Return();
     };
@@ -567,6 +580,11 @@ void EmitCppCode(const std::shared_ptr<const Operator>& op, const CompilationCon
     ostream << std::endl;
     ostream << "std::unordered_map<" << TypeName<TNumber>() << ", " << TypeName<TNumber>() << "> "
             << MemoryFieldName() << ';' << std::endl;
+    ostream << std::endl;
+    ostream << "int " << GetCharFunctionName() << "()" << std::endl;
+    ostream << "{" << std::endl;
+    ostream << IndentText << "return std::cin.get();" << std::endl;
+    ostream << "}" << std::endl;
     ostream << std::endl;
     ostream << "void " << PrintFunctionName() << "(" << TypeName<TNumber>() << " value)"
             << std::endl;

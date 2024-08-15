@@ -27,6 +27,7 @@ class PrecomputedOperator;
 class OperandOperator;
 class DefineOperator;
 class LoadVariableOperator;
+class InputOperator;
 class LoadArrayOperator;
 class PrintCharOperator;
 class ParenthesisOperator;
@@ -47,6 +48,7 @@ public:
     virtual void Visit(const std::shared_ptr<const OperandOperator>& op) = 0;
     virtual void Visit(const std::shared_ptr<const DefineOperator>& op) = 0;
     virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) = 0;
+    virtual void Visit(const std::shared_ptr<const InputOperator>& op) = 0;
     virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) = 0;
     virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) = 0;
     virtual void Visit(const std::shared_ptr<const ParenthesisOperator>& op) = 0;
@@ -342,6 +344,28 @@ public:
     virtual std::string ToString() const override
     {
         return "LoadVariableOperator [VariableName = \"" + variableName + "\"]";
+    }
+
+    MAKE_ACCEPT;
+    MAKE_GET_OPERANDS()
+};
+
+class InputOperator : public Operator, public std::enable_shared_from_this<InputOperator>
+{
+private:
+    InputOperator() {}
+
+    MAKE_ALLOCATE_HELPER(InputOperator);
+
+public:
+    static std::shared_ptr<const InputOperator> Create()
+    {
+        return AllocateHelper<InputOperator>::Allocate();
+    }
+
+    virtual std::string ToString() const override
+    {
+        return "InputOperator []";
     }
 
     MAKE_ACCEPT;

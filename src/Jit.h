@@ -24,9 +24,10 @@ struct JITCodeGenerationOption
     bool dumpProgram = false;
 };
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-TNumber EvaluateByJIT(const CompilationContext& context,
-                      ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<const Operator>& op,
-                      const JITCodeGenerationOption& option);
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+TNumber EvaluateByJIT(
+    const CompilationContext& context,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const std::shared_ptr<const Operator>& op, const JITCodeGenerationOption& option);
 }

@@ -1,0 +1,60 @@
+/*
+ * Calculator - Simple program to calculate a given expression
+ *
+ * This program reads an expression from standard input and prints the result to standard output.
+ * The results of divisions are trancated to an integer.
+ *
+ * Usage:
+ *   $ echo "1 + 2 * 3" | calc4 calculator.txt
+ *   7
+ */
+
+D[or|x,y|x == 0 ? (y == 0 ? 0 ? 1) ? 1]
+D[and|x,y|x == 1 ? (y == 1 ? 1 ? 0) ? 0]
+D[OutputOrigin||1024]
+D[OperatorOrigin||2048]
+D[OperatorMask||1000000000]
+D[AddOperator|| 200 * {OperatorMask}]
+D[SubOperator|| 201 * {OperatorMask}]
+D[MultOperator||300 * {OperatorMask}]
+D[DivOperator|| 301 * {OperatorMask}]
+D[ToOperator|c|(c == 43 /* + */ ? {AddOperator} ?
+               (c == 45 /* - */ ? {SubOperator} ?
+               (c == 42 /* * */ ? {MultOperator} ?
+               (c == 47 /* / */ ? {DivOperator} ? (0 / 0) /* Unknown operator (throw an exception) */))))]
+D[PopOperators|op|(((((L[opIndex] - 1) < {OperatorOrigin}) {or} (({op} / 100 / {OperatorMask}) > ((L[opIndex] - 1)@ / 100 / {OperatorMask})))
+                   ? 0
+                   ? (((L[opIndex] - 1)@)->L[outputIndex])
+                     ((L[outputIndex] + 1)S[outputIndex])
+                     ((L[opIndex] - 1)S[opIndex])
+                     ({op}{PopOperators})))]
+D[Parse||(((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? 0 ?
+         ((IS)
+          (((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? (((L[outputIndex] + 1)S[outputIndex])(0{PopOperators})((L[outputIndex] - 1)S[outputIndex])) ?
+          ((((L >= 48) {and} (L <= 57)) ? ((L[outputIndex]@ * 10 + (L - 48))->L[outputIndex]) ?
+           ((L == 32) ? 0 ?
+           ((L == 40) ? ((0->L[opIndex])((L[opIndex] + 1)S[opIndex])({Parse})) ?
+           ((L == 41) ? ((L[outputIndex] + 1)S[outputIndex])((100 * {OperatorMask}){PopOperators})((L[outputIndex] - 1)S[outputIndex])((L[opIndex] - 1)S[opIndex])(0) ?
+           ((L{ToOperator}S)
+            ((L[outputIndex] + 1)S[outputIndex])
+            (L{PopOperators})
+            (L->L[opIndex])
+            ((L[opIndex] + 1)S[opIndex]))))))
+           ({Parse})))))]
+D[Operate|op,y,x| {op} == {AddOperator} ? (x + y) ?
+                 ({op} == {SubOperator} ? (x - y) ?
+                 ({op} == {MultOperator} ? (x * y) ?
+                 ({op} == {DivOperator} ? (x / y) ? (0 / 0) /* Unknown operator (throw an exception) */)))]
+D[Execute||L[executeIndex]@ < {OperatorMask} ? (L[executeIndex]@S)((L[executeIndex] - 1)S[executeIndex])L ?
+           (((L[executeIndex]@)S((L[executeIndex] - 1)S[executeIndex])L)
+              {Operate}
+             {Execute}
+              {Operate}
+             {Execute})]
+
+({OutputOrigin}S[outputIndex])
+({OperatorOrigin}S[opIndex])
+(0 - 2)S
+({Parse})
+(L[outputIndex]S[executeIndex])
+({Execute})

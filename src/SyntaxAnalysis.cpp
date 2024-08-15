@@ -249,6 +249,8 @@ public:
             return LexStoreVariableToken();
         case 'P':
             return LexPrintCharToken();
+        case 'I':
+            return LexInputToken();
         case '@':
             return LexLoadArrayToken();
         case '0':
@@ -335,6 +337,13 @@ public:
         auto position = reader.GetCurrentPosition();
         reader.Read();
         return std::make_shared<PrintCharToken>(position, LexSupplementaryText());
+    }
+
+    std::shared_ptr<InputToken> LexInputToken()
+    {
+        auto position = reader.GetCurrentPosition();
+        reader.Read();
+        return std::make_shared<InputToken>(position, LexSupplementaryText());
     }
 
     std::shared_ptr<LoadArrayToken> LexLoadArrayToken()

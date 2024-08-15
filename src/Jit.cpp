@@ -47,24 +47,24 @@
 namespace calc4
 {
 /* Explicit instantiation of "EvaluateByJIT" Function */
-#define InstantiateEvaluateByJIT(TNumber, TPrinter)                                                \
+#define InstantiateEvaluateByJIT(TNumber, TInputSource, TPrinter)                                  \
     template TNumber EvaluateByJIT<TNumber, DefaultVariableSource<TNumber>,                        \
-                                   DefaultGlobalArraySource<TNumber>, TPrinter>(                   \
+                                   DefaultGlobalArraySource<TNumber>, TInputSource, TPrinter>(     \
         const CompilationContext& context,                                                         \
         ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
-                       TPrinter>& state,                                                           \
+                       TInputSource, TPrinter>& state,                                             \
         const std::shared_ptr<const Operator>& op, const JITCodeGenerationOption& option)
 
-InstantiateEvaluateByJIT(int32_t, DefaultPrinter);
-InstantiateEvaluateByJIT(int64_t, DefaultPrinter);
-InstantiateEvaluateByJIT(int32_t, BufferedPrinter);
-InstantiateEvaluateByJIT(int64_t, BufferedPrinter);
-InstantiateEvaluateByJIT(int32_t, StreamPrinter);
-InstantiateEvaluateByJIT(int64_t, StreamPrinter);
+InstantiateEvaluateByJIT(int32_t, DefaultInputSource, DefaultPrinter);
+InstantiateEvaluateByJIT(int64_t, DefaultInputSource, DefaultPrinter);
+InstantiateEvaluateByJIT(int32_t, BufferedInputSource, BufferedPrinter);
+InstantiateEvaluateByJIT(int64_t, BufferedInputSource, BufferedPrinter);
+InstantiateEvaluateByJIT(int32_t, StreamInputSource, StreamPrinter);
+InstantiateEvaluateByJIT(int64_t, StreamInputSource, StreamPrinter);
 #ifdef ENABLE_INT128
-InstantiateEvaluateByJIT(__int128_t, DefaultPrinter);
-InstantiateEvaluateByJIT(__int128_t, BufferedPrinter);
-InstantiateEvaluateByJIT(__int128_t, StreamPrinter);
+InstantiateEvaluateByJIT(__int128_t, DefaultInputSource, DefaultPrinter);
+InstantiateEvaluateByJIT(__int128_t, BufferedInputSource, BufferedPrinter);
+InstantiateEvaluateByJIT(__int128_t, StreamInputSource, StreamPrinter);
 #endif // ENABLE_INT128
 
 namespace
@@ -75,39 +75,53 @@ constexpr const char* EntryBlockName = "entry";
 template<typename TNumber>
 size_t IntegerBits = sizeof(TNumber) * 8;
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-void GenerateIR(const CompilationContext& context, const JITCodeGenerationOption& option,
-                ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
-                llvm::Module* llvmModule);
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+void GenerateIR(
+    const CompilationContext& context, const JITCodeGenerationOption& option,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
+    llvm::Module* llvmModule);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 class IRGenerator;
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void ThrowZeroDivisionException(void* state);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+int GetChar(void* state);
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void PrintChar(void* state, char c);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 TNumber LoadVariable(void* state, const char* variableName);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void StoreVariable(void* state, const char* variableName, TNumber value);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 TNumber LoadArray(void* state, TNumber index);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void StoreArray(void* state, TNumber index, TNumber value);
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-TNumber EvaluateByJIT(const CompilationContext& context,
-                      ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                      const std::shared_ptr<const Operator>& op,
-                      const JITCodeGenerationOption& option)
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+TNumber EvaluateByJIT(
+    const CompilationContext& context,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const std::shared_ptr<const Operator>& op, const JITCodeGenerationOption& option)
 {
     using namespace llvm;
     LLVMContext Context;
@@ -176,9 +190,9 @@ TNumber EvaluateByJIT(const CompilationContext& context,
         throw error;
     }
 
-    auto func =
-        (TNumber(*)(ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*))
-            EE->getFunctionAddress(MainFunctionName);
+    auto func = (TNumber(*)(
+        ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>*))
+                    EE->getFunctionAddress(MainFunctionName);
 
     if (!error.empty())
     {
@@ -192,11 +206,13 @@ TNumber EvaluateByJIT(const CompilationContext& context,
 
 namespace
 {
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-void GenerateIR(const CompilationContext& context, const JITCodeGenerationOption& option,
-                ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state,
-                const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
-                llvm::Module* llvmModule)
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+void GenerateIR(
+    const CompilationContext& context, const JITCodeGenerationOption& option,
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state,
+    const std::shared_ptr<const Operator>& op, llvm::LLVMContext* llvmContext,
+    llvm::Module* llvmModule)
 {
     /* ***** Initialize variables ***** */
     llvm::Type* integerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
@@ -235,7 +251,7 @@ void GenerateIR(const CompilationContext& context, const JITCodeGenerationOption
         llvm::BasicBlock* block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         auto builder = std::make_shared<llvm::IRBuilder<>>(block);
 
-        IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
+        IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter> generator(
             llvmModule, llvmContext, function, builder, functionMap, option, isMainFunction);
         generator.BeginFunction();
         op->Accept(generator);
@@ -260,7 +276,8 @@ struct InternalFunction
     llvm::Value* address;
 };
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 class IRGeneratorBase : public OperatorVisitor
 {
 protected:
@@ -272,7 +289,7 @@ protected:
     JITCodeGenerationOption option;
     bool isMainFunction;
 
-    InternalFunction throwZeroDivision, printChar, loadVariable, storeVariable, loadArray,
+    InternalFunction throwZeroDivision, getChar, printChar, loadVariable, storeVariable, loadArray,
         storeArray;
 
 public:
@@ -289,7 +306,8 @@ public:
 #define GET_LLVM_FUNCTION_ADDRESS(NAME)                                                            \
     this->builder->getIntN(                                                                        \
         IntegerBits<void*>,                                                                        \
-        reinterpret_cast<uint64_t>(&NAME<TNumber, TVariableSource, TGlobalArraySource, TPrinter>))
+        reinterpret_cast<uint64_t>(                                                                \
+            &NAME<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>))
 
 #define GET_INTERNAL_FUNCTION(NAME, RETURN_TYPE, ...)                                              \
     { GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, __VA_ARGS__), GET_LLVM_FUNCTION_ADDRESS(NAME) }
@@ -302,6 +320,7 @@ public:
         throwZeroDivision = GET_INTERNAL_FUNCTION(
             ThrowZeroDivisionException, llvm::Type::getVoidTy(*this->context), { voidPointerType });
 
+        getChar = GET_INTERNAL_FUNCTION(GetChar, this->builder->getInt32Ty(), { voidPointerType });
         printChar = GET_INTERNAL_FUNCTION(PrintChar, llvm::Type::getVoidTy(*this->context),
                                           { voidPointerType, this->builder->getInt8Ty() });
         loadVariable =
@@ -317,14 +336,17 @@ public:
     virtual void EndFunction() = 0;
 };
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
-class IRGenerator : public IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+class IRGenerator
+    : public IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>
 {
 private:
     llvm::Value* value;
 
 public:
-    using IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TPrinter>::IRGeneratorBase;
+    using IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TInputSource,
+                          TPrinter>::IRGeneratorBase;
 
     virtual void BeginFunction() override {}
 
@@ -367,6 +389,21 @@ public:
         this->value = CallInternalFunction(this->loadVariable,
                                            { &*this->function->arg_begin(), variableName },
                                            this->builder.get());
+    };
+
+    virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+    {
+        auto character = CallInternalFunction(this->getChar, { &*this->function->arg_begin() },
+                                              this->builder.get());
+        if (this->GetIntegerType()->isIntegerTy(IntegerBits<int>))
+        {
+            this->value = character;
+        }
+        else
+        {
+            this->value = this->builder->CreateSExt(character,
+                                                    this->builder->getIntNTy(IntegerBits<TNumber>));
+        }
     };
 
     virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
@@ -562,9 +599,9 @@ public:
         auto Core = [this, temp](llvm::BasicBlock* block,
                                  const std::shared_ptr<const Operator>& op) {
             auto builder = std::make_shared<llvm::IRBuilder<>>(block);
-            IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TPrinter> generator(
-                this->module, this->context, this->function, builder, this->functionMap,
-                this->option, this->isMainFunction);
+            IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>
+                generator(this->module, this->context, this->function, builder, this->functionMap,
+                          this->option, this->isMainFunction);
             op->Accept(generator);
             generator.builder->CreateStore(generator.value, temp);
             return (this->builder = generator.builder);
@@ -618,7 +655,8 @@ private:
 };
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void ThrowZeroDivisionException(void* state)
 {
 #ifdef _MSC_VER
@@ -633,44 +671,62 @@ void ThrowZeroDivisionException(void* state)
 #endif // _MSC_VER
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
+int GetChar(void* state)
+{
+    return reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource,
+                                           TInputSource, TPrinter>*>(state)
+        ->GetChar();
+}
+
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void PrintChar(void* state, char c)
 {
-    reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+    reinterpret_cast<
+        ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>*>(
+        state)
         ->PrintChar(c);
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 TNumber LoadVariable(void* state, const char* variableName)
 {
-    return reinterpret_cast<
-               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+    return reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource,
+                                           TInputSource, TPrinter>*>(state)
         ->GetVariableSource()
         .Get(variableName);
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void StoreVariable(void* state, const char* variableName, TNumber value)
 {
-    reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+    reinterpret_cast<
+        ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>*>(
+        state)
         ->GetVariableSource()
         .Set(variableName, value);
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 TNumber LoadArray(void* state, TNumber index)
 {
-    return reinterpret_cast<
-               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+    return reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource,
+                                           TInputSource, TPrinter>*>(state)
         ->GetArraySource()
         .Get(index);
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter>
 void StoreArray(void* state, TNumber index, TNumber value)
 {
-    return reinterpret_cast<
-               ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>*>(state)
+    return reinterpret_cast<ExecutionState<TNumber, TVariableSource, TGlobalArraySource,
+                                           TInputSource, TPrinter>*>(state)
         ->GetArraySource()
         .Set(index, value);
 }

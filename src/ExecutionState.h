@@ -27,6 +27,55 @@ class DefaultVariableSource;
 template<typename TNumber>
 class DefaultGlobalArraySource;
 
+struct DefaultInputSource
+{
+    int operator()() const
+    {
+        static_assert(std::is_same_v<decltype(std::cin.get()), int>);
+        static_assert(std::char_traits<char>::eof() == -1);
+        return std::cin.get();
+    }
+};
+
+struct BufferedInputSource
+{
+private:
+    std::string_view buffer;
+    size_t nextIndex;
+
+public:
+    BufferedInputSource(std::string_view buffer) : buffer(buffer), nextIndex(0) {}
+
+    int operator()()
+    {
+        size_t index = nextIndex;
+
+        if (index < buffer.length())
+        {
+            nextIndex++;
+            return static_cast<int>(buffer[index]);
+        }
+
+        return -1;
+    }
+};
+
+struct StreamInputSource
+{
+private:
+    std::istream* stream;
+
+public:
+    StreamInputSource(std::istream* stream) : stream(stream) {}
+
+    int operator()() const
+    {
+        static_assert(std::is_same_v<decltype(stream->get()), int>);
+        static_assert(std::char_traits<char>::eof() == -1);
+        return stream->get();
+    }
+};
+
 struct DefaultPrinter
 {
     void operator()(char c) const
@@ -65,18 +114,22 @@ public:
 
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
-         typename TPrinter = DefaultPrinter>
+         typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
 class ExecutionState
 {
 private:
     TVariableSource variableSource;
     TGlobalArraySource arraySource;
+    TInputSource inputSource;
     TPrinter printer;
 
 public:
     ExecutionState() {}
 
-    ExecutionState(TPrinter printer) : printer(printer) {}
+    ExecutionState(TInputSource inputSource, TPrinter printer)
+        : inputSource(inputSource), printer(printer)
+    {
+    }
 
     TVariableSource& GetVariableSource()
     {
@@ -96,6 +149,11 @@ public:
     const TGlobalArraySource& GetArraySource() const
     {
         return arraySource;
+    }
+
+    int GetChar()
+    {
+        return inputSource();
     }
 
     void PrintChar(char c) const

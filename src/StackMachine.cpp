@@ -106,31 +106,31 @@ InstantiateGenerateStackMachineModule(mpz_class);
 
 /*****/
 
-#define InstantiateExecuteStackMachineModule(TNumber, TPrinter)                                    \
+#define InstantiateExecuteStackMachineModule(TNumber, TInputSource, TPrinter)                      \
     template TNumber ExecuteStackMachineModule<TNumber, DefaultVariableSource<TNumber>,            \
-                                               DefaultGlobalArraySource<TNumber>, TPrinter,        \
-                                               std::vector<TNumber>, std::vector<int>>(            \
+                                               DefaultGlobalArraySource<TNumber>, TInputSource,    \
+                                               TPrinter, std::vector<TNumber>, std::vector<int>>(  \
         const StackMachineModule<TNumber>& module,                                                 \
         ExecutionState<TNumber, DefaultVariableSource<TNumber>, DefaultGlobalArraySource<TNumber>, \
-                       TPrinter>& state)
+                       TInputSource, TPrinter>& state)
 
-InstantiateExecuteStackMachineModule(int32_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(int32_t, BufferedPrinter);
-InstantiateExecuteStackMachineModule(int32_t, StreamPrinter);
-InstantiateExecuteStackMachineModule(int64_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(int64_t, BufferedPrinter);
-InstantiateExecuteStackMachineModule(int64_t, StreamPrinter);
+InstantiateExecuteStackMachineModule(int32_t, DefaultInputSource, DefaultPrinter);
+InstantiateExecuteStackMachineModule(int32_t, BufferedInputSource, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int32_t, StreamInputSource, StreamPrinter);
+InstantiateExecuteStackMachineModule(int64_t, DefaultInputSource, DefaultPrinter);
+InstantiateExecuteStackMachineModule(int64_t, BufferedInputSource, BufferedPrinter);
+InstantiateExecuteStackMachineModule(int64_t, StreamInputSource, StreamPrinter);
 
 #ifdef ENABLE_INT128
-InstantiateExecuteStackMachineModule(__int128_t, DefaultPrinter);
-InstantiateExecuteStackMachineModule(__int128_t, BufferedPrinter);
-InstantiateExecuteStackMachineModule(__int128_t, StreamPrinter);
+InstantiateExecuteStackMachineModule(__int128_t, DefaultInputSource, DefaultPrinter);
+InstantiateExecuteStackMachineModule(__int128_t, BufferedInputSource, BufferedPrinter);
+InstantiateExecuteStackMachineModule(__int128_t, StreamInputSource, StreamPrinter);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
-InstantiateExecuteStackMachineModule(mpz_class, DefaultPrinter);
-InstantiateExecuteStackMachineModule(mpz_class, BufferedPrinter);
-InstantiateExecuteStackMachineModule(mpz_class, StreamPrinter);
+InstantiateExecuteStackMachineModule(mpz_class, DefaultInputSource, DefaultPrinter);
+InstantiateExecuteStackMachineModule(mpz_class, BufferedInputSource, BufferedPrinter);
+InstantiateExecuteStackMachineModule(mpz_class, StreamInputSource, StreamPrinter);
 #endif // ENABLE_GMP
 
 /*****/
@@ -354,6 +354,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
         {
             AddOperation(StackMachineOpcode::LoadVariable,
                          GetOrCreateVariableIndex(op->GetVariableName()));
+        };
+
+        virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+        {
+            AddOperation(StackMachineOpcode::Input, 0);
         };
 
         virtual void Visit(const std::shared_ptr<const LoadArrayOperator>& op) override
@@ -724,11 +729,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
     return StackMachineModule<TNumber>(entryPoint, constTable, userDefinedOperators, variables);
 }
 
-template<typename TNumber, typename TVariableSource, typename TGlobalArraySource, typename TPrinter,
-         typename TStackArray, typename TPtrStackArray>
+template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
+         typename TInputSource, typename TPrinter, typename TStackArray, typename TPtrStackArray>
 TNumber ExecuteStackMachineModule(
     const StackMachineModule<TNumber>& module,
-    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TPrinter>& state)
+    ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>& state)
 {
     static constexpr size_t StackSize = 1 << 20;
     static constexpr size_t PtrStackSize = 1 << 20;
@@ -868,7 +873,9 @@ TNumber ExecuteStackMachineModule(
 
         COMPUTED_GOTO_CASE(Input)
         {
-            throw "Not implemented";
+            *top = static_cast<TNumber>(state.GetChar());
+            top++;
+            COMPUTED_GOTO_NEXT_OPERATION();
         }
 
         COMPUTED_GOTO_CASE(PrintChar)

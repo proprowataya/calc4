@@ -81,6 +81,11 @@ public:
         value = LoadArrayOperator::Create(index);
     };
 
+    virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
+    {
+        value = op;
+    };
+
     virtual void Visit(const std::shared_ptr<const PrintCharOperator>& op) override
     {
         std::shared_ptr<const Operator> character = Precompute(op->GetCharacter());
@@ -274,6 +279,11 @@ public:
     };
 
     virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
+    {
+        value = op;
+    };
+
+    virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
     {
         value = op;
     };
