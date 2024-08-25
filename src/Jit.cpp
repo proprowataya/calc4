@@ -16,6 +16,7 @@
 #include <memory>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
@@ -71,6 +72,7 @@ namespace
 {
 constexpr const char* MainFunctionName = "__[Main]__";
 constexpr const char* EntryBlockName = "entry";
+constexpr const char* GlobalVariableNamePrefix = "variable_";
 
 template<typename TNumber>
 size_t IntegerBits = sizeof(TNumber) * 8;
@@ -86,6 +88,9 @@ void GenerateIR(
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
          typename TInputSource, typename TPrinter>
 class IRGenerator;
+
+std::unordered_set<std::string> GatherVariableNames(const std::shared_ptr<const Operator>& op,
+                                                    const CompilationContext& context);
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
@@ -237,6 +242,9 @@ void GenerateIR(
             functionType, llvm::Function::ExternalLinkage, definition.GetName(), llvmModule);
     }
 
+    /* ***** Gather variable names ***** */
+    auto variableNames = GatherVariableNames(op, context);
+
     /* ***** Make main function ***** */
     llvm::FunctionType* funcType =
         llvm::FunctionType::get(integerType, { executionStateType }, false);
@@ -245,14 +253,15 @@ void GenerateIR(
 
     /* ***** Generate IR ****** */
     // Local helper function
-    auto Emit = [llvmModule, llvmContext, &functionMap,
-                 &option](llvm::Function* function, const std::shared_ptr<const Operator>& op,
-                          bool isMainFunction) {
+    auto Emit = [llvmModule, llvmContext, &functionMap, &option,
+                 &variableNames](llvm::Function* function,
+                                 const std::shared_ptr<const Operator>& op, bool isMainFunction) {
         llvm::BasicBlock* block = llvm::BasicBlock::Create(*llvmContext, EntryBlockName, function);
         auto builder = std::make_shared<llvm::IRBuilder<>>(block);
 
         IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter> generator(
-            llvmModule, llvmContext, function, builder, functionMap, option, isMainFunction);
+            llvmModule, llvmContext, function, builder, functionMap, option, variableNames,
+            isMainFunction);
         generator.BeginFunction();
         op->Accept(generator);
         generator.EndFunction();
@@ -287,6 +296,7 @@ protected:
     std::shared_ptr<llvm::IRBuilder<>> builder;
     std::unordered_map<std::string, llvm::Function*> functionMap;
     JITCodeGenerationOption option;
+    const std::unordered_set<std::string>& variableNames;
     bool isMainFunction;
 
     InternalFunction throwZeroDivision, getChar, printChar, loadVariable, storeVariable, loadArray,
@@ -296,9 +306,11 @@ public:
     IRGeneratorBase(llvm::Module* module, llvm::LLVMContext* context, llvm::Function* function,
                     const std::shared_ptr<llvm::IRBuilder<>>& builder,
                     const std::unordered_map<std::string, llvm::Function*>& functionMap,
-                    const JITCodeGenerationOption& option, bool isMainFunction)
+                    const JITCodeGenerationOption& option,
+                    const std::unordered_set<std::string>& variableNames, bool isMainFunction)
         : module(module), context(context), function(function), builder(builder),
-          functionMap(functionMap), option(option), isMainFunction(isMainFunction)
+          functionMap(functionMap), option(option), variableNames(variableNames),
+          isMainFunction(isMainFunction)
     {
 #define GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, ...)                                                   \
     llvm::FunctionType::get(RETURN_TYPE, { __VA_ARGS__ }, false)
@@ -348,10 +360,50 @@ public:
     using IRGeneratorBase<TNumber, TVariableSource, TGlobalArraySource, TInputSource,
                           TPrinter>::IRGeneratorBase;
 
-    virtual void BeginFunction() override {}
+    virtual void BeginFunction() override
+    {
+        if (this->isMainFunction)
+        {
+            // If this is the main function, we need to exchange variables with TVariableSource. We
+            // restore all variables at the beginning and pass the modified ones at the end.
+
+            for (auto& variableName : this->variableNames)
+            {
+                llvm::GlobalVariable* variableNameStr =
+                    this->builder->CreateGlobalString(variableName);
+                llvm::GlobalVariable* variable = GetGlobalVariable(variableName);
+
+                // Restore the value from TVariableSource
+                auto value = CallInternalFunction(
+                    this->loadVariable, { &*this->function->arg_begin(), variableNameStr },
+                    this->builder.get());
+
+                // Store it in the JITed global variable
+                this->builder->CreateStore(value, variable);
+            }
+        }
+    }
 
     virtual void EndFunction() override
     {
+        if (this->isMainFunction)
+        {
+            for (auto& variableName : this->variableNames)
+            {
+                llvm::GlobalVariable* variableNameStr =
+                    this->builder->CreateGlobalString(variableName);
+                llvm::GlobalVariable* variable = GetGlobalVariable(variableName);
+
+                // Load value from the JITed global variable
+                auto value = this->builder->CreateLoad(GetIntegerType(), variable);
+
+                // Store it in TVariableSource
+                CallInternalFunction(this->storeVariable,
+                                     { &*this->function->arg_begin(), variableNameStr, value },
+                                     this->builder.get());
+            }
+        }
+
         this->builder->CreateRet(this->value);
     }
 
@@ -384,11 +436,8 @@ public:
 
     virtual void Visit(const std::shared_ptr<const LoadVariableOperator>& op) override
     {
-        llvm::GlobalVariable* variableName =
-            this->builder->CreateGlobalString(op->GetVariableName());
-        this->value = CallInternalFunction(this->loadVariable,
-                                           { &*this->function->arg_begin(), variableName },
-                                           this->builder.get());
+        auto variable = GetGlobalVariable(op->GetVariableName());
+        this->value = this->builder->CreateLoad(GetIntegerType(), variable);
     };
 
     virtual void Visit(const std::shared_ptr<const InputOperator>& op) override
@@ -446,11 +495,8 @@ public:
     virtual void Visit(const std::shared_ptr<const StoreVariableOperator>& op) override
     {
         op->GetOperand()->Accept(*this);
-        llvm::GlobalVariable* variableName =
-            this->builder->CreateGlobalString(op->GetVariableName());
-        CallInternalFunction(this->storeVariable,
-                             { &*this->function->arg_begin(), variableName, value },
-                             this->builder.get());
+        auto variable = GetGlobalVariable(op->GetVariableName());
+        this->builder->CreateStore(this->value, variable);
     }
 
     virtual void Visit(const std::shared_ptr<const StoreArrayOperator>& op) override
@@ -601,7 +647,7 @@ public:
             auto builder = std::make_shared<llvm::IRBuilder<>>(block);
             IRGenerator<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>
                 generator(this->module, this->context, this->function, builder, this->functionMap,
-                          this->option, this->isMainFunction);
+                          this->option, this->variableNames, this->isMainFunction);
             op->Accept(generator);
             generator.builder->CreateStore(generator.value, temp);
             return (this->builder = generator.builder);
@@ -648,11 +694,77 @@ private:
         return builder->CreateCall(func.type, functionPtr, arguments);
     }
 
+    llvm::GlobalVariable* GetGlobalVariable(const std::string& variableName)
+    {
+        // First, try to find the global variable from our module
+        std::string actualVariableName = GlobalVariableNamePrefix + variableName;
+        auto variable = this->module->getGlobalVariable(actualVariableName);
+        if (variable != nullptr)
+        {
+            return variable;
+        }
+
+        // If it does not exist, create a new one
+        variable = new llvm::GlobalVariable(*this->module, GetIntegerType(), false,
+                                            llvm::GlobalVariable::LinkageTypes::CommonLinkage,
+                                            llvm::ConstantInt::get(GetIntegerType(), 0),
+                                            actualVariableName);
+        return variable;
+    }
+
     llvm::Type* GetIntegerType() const
     {
         return this->builder->getIntNTy(IntegerBits<TNumber>);
     }
 };
+
+void GatherVariableNamesCore(const std::shared_ptr<const Operator>& op,
+                             const CompilationContext& context,
+                             std::unordered_set<std::string>& set,
+                             std::unordered_set<std::string>& visitedUserDefinedOperators)
+{
+    if (auto userDefined = dynamic_cast<const UserDefinedOperator*>(op.get()))
+    {
+        auto& name = userDefined->GetDefinition().GetName();
+
+        if (visitedUserDefinedOperators.find(name) != visitedUserDefinedOperators.end())
+        {
+            visitedUserDefinedOperators.insert(name);
+            auto& implement = context.GetOperatorImplement(name);
+            GatherVariableNamesCore(implement.GetOperator(), context, set,
+                                    visitedUserDefinedOperators);
+        }
+    }
+    else if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(op.get()))
+    {
+        for (auto& op2 : parenthesis->GetOperators())
+        {
+            GatherVariableNamesCore(op2, context, set, visitedUserDefinedOperators);
+        }
+    }
+    else if (auto loadVariable = dynamic_cast<const LoadVariableOperator*>(op.get()))
+    {
+        set.insert(loadVariable->GetVariableName());
+    }
+    else if (auto storeVariable = dynamic_cast<const StoreVariableOperator*>(op.get()))
+    {
+        set.insert(storeVariable->GetVariableName());
+    }
+
+    for (auto& operand : op->GetOperands())
+    {
+        GatherVariableNamesCore(operand, context, set, visitedUserDefinedOperators);
+    }
+}
+
+std::unordered_set<std::string> GatherVariableNames(const std::shared_ptr<const Operator>& op,
+                                                    const CompilationContext& context)
+{
+    std::unordered_set<std::string> variableNames;
+    std::unordered_set<std::string> visitedUserDefinedOperators;
+    GatherVariableNamesCore(op, context, variableNames, visitedUserDefinedOperators);
+    return variableNames;
+}
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
