@@ -603,7 +603,7 @@ As you can see from this README, Calc4 is far from a practical programming langu
 
 ## Copyright
 
-Copyright (C) 2018-2024 Yuya Watari
+Copyright (C) 2018-2025 Yuya Watari
 
 ## License
 
