@@ -2,7 +2,7 @@
  *
  * The Calc4 Programming Language
  *
- * Copyright (C) 2018-2024 Yuya Watari
+ * Copyright (C) 2018-2025 Yuya Watari
  * This software is released under the MIT License, see LICENSE file for details
  *
  *****/
