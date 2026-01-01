@@ -170,6 +170,7 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
             {
             case StackMachineOpcode::Goto:
             case StackMachineOpcode::GotoIfTrue:
+            case StackMachineOpcode::GotoIfFalse:
             case StackMachineOpcode::GotoIfEqual:
             case StackMachineOpcode::GotoIfLessThan:
             case StackMachineOpcode::GotoIfLessThanOrEqual:
@@ -288,6 +289,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 {
                 case StackMachineOpcode::Goto:
                 case StackMachineOpcode::GotoIfTrue:
+                case StackMachineOpcode::GotoIfFalse:
                 case StackMachineOpcode::GotoIfEqual:
                 case StackMachineOpcode::GotoIfLessThan:
                 case StackMachineOpcode::GotoIfLessThanOrEqual:
@@ -429,13 +431,13 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             };
 
             auto EmitNormalizeTopToBool = [this]() {
-                int ifTrue = nextLabel++, end = nextLabel++;
+                int ifFalse = nextLabel++, end = nextLabel++;
 
-                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrue);
-                AddOperation(StackMachineOpcode::LoadConst, 0);
-                AddOperation(StackMachineOpcode::Goto, end);
-                AddOperation(StackMachineOpcode::Lavel, ifTrue);
+                AddOperation(StackMachineOpcode::GotoIfFalse, ifFalse);
                 AddOperation(StackMachineOpcode::LoadConst, 1);
+                AddOperation(StackMachineOpcode::Goto, end);
+                AddOperation(StackMachineOpcode::Lavel, ifFalse);
+                AddOperation(StackMachineOpcode::LoadConst, 0);
                 AddOperation(StackMachineOpcode::Lavel, end);
 
                 // StackSize increased by two due to two LoadConst operations.
@@ -446,16 +448,16 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
 
             if (op->GetType() == BinaryType::LogicalAnd)
             {
-                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+                int ifFalseLabel = nextLabel++, endLabel = nextLabel++;
                 op->GetLeft()->Accept(*this);
-                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
+                AddOperation(StackMachineOpcode::GotoIfFalse, ifFalseLabel);
                 int savedStackSize = stackSize;
-                AddOperation(StackMachineOpcode::LoadConst, 0);
-                AddOperation(StackMachineOpcode::Goto, endLabel);
-                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
-                stackSize = savedStackSize;
                 op->GetRight()->Accept(*this);
                 EmitNormalizeTopToBool();
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+                AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
+                stackSize = savedStackSize;
+                AddOperation(StackMachineOpcode::LoadConst, 0);
                 AddOperation(StackMachineOpcode::Lavel, endLabel);
                 return;
             }
@@ -600,11 +602,9 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                     return;
                 case BinaryType::LogicalAnd:
                 {
-                    int evalRightLabel = nextLabel++, ifFalseLabel = nextLabel++;
+                    int ifFalseLabel = nextLabel++;
                     binary->GetLeft()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfTrue, evalRightLabel);
-                    AddOperation(StackMachineOpcode::Goto, ifFalseLabel);
-                    AddOperation(StackMachineOpcode::Lavel, evalRightLabel);
+                    AddOperation(StackMachineOpcode::GotoIfFalse, ifFalseLabel);
                     binary->GetRight()->Accept(*this);
                     AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
                     AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
@@ -698,6 +698,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             case StackMachineOpcode::Mod:
             case StackMachineOpcode::ModChecked:
             case StackMachineOpcode::GotoIfTrue:
+            case StackMachineOpcode::GotoIfFalse:
             case StackMachineOpcode::Return:
             case StackMachineOpcode::Halt:
                 AddStackSize(-1);
@@ -856,6 +857,7 @@ TNumber ExecuteStackMachineModule(
         &&COMPUTED_GOTO_LABEL_OF(ModChecked),
         &&COMPUTED_GOTO_LABEL_OF(Goto),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfFalse),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfEqual),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThan),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThanOrEqual),
@@ -1054,6 +1056,16 @@ TNumber ExecuteStackMachineModule(
         {
             top--;
             if (*top != 0)
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfFalse)
+        {
+            top--;
+            if (*top == 0)
             {
                 COMPUTED_GOTO_JUMP(op->value);
             }

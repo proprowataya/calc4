@@ -41,6 +41,7 @@ enum class StackMachineOpcode : int8_t
     ModChecked,
     Goto,
     GotoIfTrue,
+    GotoIfFalse,
     GotoIfEqual,
     GotoIfLessThan,
     GotoIfLessThanOrEqual,
@@ -191,6 +192,8 @@ inline constexpr const char* ToString(StackMachineOpcode opcode)
         return "Goto";
     case StackMachineOpcode::GotoIfTrue:
         return "GotoIfTrue";
+    case StackMachineOpcode::GotoIfFalse:
+        return "GotoIfFalse";
     case StackMachineOpcode::GotoIfEqual:
         return "GotoIfEqual";
     case StackMachineOpcode::GotoIfLessThan:
