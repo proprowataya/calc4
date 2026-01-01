@@ -559,7 +559,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
 
             if (auto* binary = dynamic_cast<const BinaryOperator*>(op->GetCondition().get()))
             {
-                // Special optimiztion for comparisons
+                // Special optimization for comparisons
                 switch (binary->GetType())
                 {
                 case BinaryType::Equal:
