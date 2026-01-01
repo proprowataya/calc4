@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.24)
 
 add_library(calc4-core STATIC Common.cpp CppEmitter.cpp Optimizer.cpp StackMachine.cpp SyntaxAnalysis.cpp Common.h CppEmitter.h Evaluator.h Exceptions.h ExecutionState.h Operators.h Optimizer.h ReplCommon.h StackMachine.h SyntaxAnalysis.h)
 add_executable(calc4 Main.cpp ReplCommon.h)
