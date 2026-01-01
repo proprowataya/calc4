@@ -515,6 +515,56 @@ public:
 
     virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
     {
+        if (op->GetType() == BinaryType::LogicalAnd || op->GetType() == BinaryType::LogicalOr)
+        {
+            op->GetLeft()->Accept(*this);
+            auto left = this->value;
+
+            auto zero = this->builder->getIntN(IntegerBits<TNumber>, 0);
+            auto one = this->builder->getIntN(IntegerBits<TNumber>, 1);
+            auto cond = this->builder->CreateICmpNE(left, zero);
+
+            llvm::Value* temp = this->builder->CreateAlloca(this->GetIntegerType());
+            auto oldBuilder = this->builder;
+
+            llvm::BasicBlock* evalRight =
+                llvm::BasicBlock::Create(*this->context, "", this->function);
+            llvm::BasicBlock* shortCircuit =
+                llvm::BasicBlock::Create(*this->context, "", this->function);
+            llvm::BasicBlock* endBlock =
+                llvm::BasicBlock::Create(*this->context, "", this->function);
+
+            if (op->GetType() == BinaryType::LogicalAnd)
+            {
+                oldBuilder->CreateCondBr(cond, evalRight, shortCircuit);
+            }
+            else
+            {
+                oldBuilder->CreateCondBr(cond, shortCircuit, evalRight);
+            }
+
+            {
+                auto shortBuilder = std::make_shared<llvm::IRBuilder<>>(shortCircuit);
+                shortBuilder->CreateStore(op->GetType() == BinaryType::LogicalAnd ? zero : one,
+                                          temp);
+                shortBuilder->CreateBr(endBlock);
+            }
+
+            {
+                this->builder = std::make_shared<llvm::IRBuilder<>>(evalRight);
+                op->GetRight()->Accept(*this);
+                auto right = this->value;
+                auto rightCond = this->builder->CreateICmpNE(right, zero);
+                auto rightBool = this->builder->CreateSelect(rightCond, one, zero);
+                this->builder->CreateStore(rightBool, temp);
+                this->builder->CreateBr(endBlock);
+            }
+
+            this->builder = std::make_shared<llvm::IRBuilder<>>(endBlock);
+            this->value = this->builder->CreateLoad(this->GetIntegerType(), temp);
+            return;
+        }
+
         op->GetLeft()->Accept(*this);
         auto left = this->value;
         op->GetRight()->Accept(*this);

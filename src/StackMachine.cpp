@@ -428,6 +428,54 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 AddStackSize(-1);
             };
 
+            auto EmitNormalizeTopToBool = [this]() {
+                int ifTrue = nextLabel++, end = nextLabel++;
+
+                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrue);
+                AddOperation(StackMachineOpcode::LoadConst, 0);
+                AddOperation(StackMachineOpcode::Goto, end);
+                AddOperation(StackMachineOpcode::Lavel, ifTrue);
+                AddOperation(StackMachineOpcode::LoadConst, 1);
+                AddOperation(StackMachineOpcode::Lavel, end);
+
+                // StackSize increased by two due to two LoadConst operations.
+                // However, only one of them will be executed.
+                // We modify StackSize here.
+                AddStackSize(-1);
+            };
+
+            if (op->GetType() == BinaryType::LogicalAnd)
+            {
+                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+                op->GetLeft()->Accept(*this);
+                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
+                int savedStackSize = stackSize;
+                AddOperation(StackMachineOpcode::LoadConst, 0);
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+                stackSize = savedStackSize;
+                op->GetRight()->Accept(*this);
+                EmitNormalizeTopToBool();
+                AddOperation(StackMachineOpcode::Lavel, endLabel);
+                return;
+            }
+
+            if (op->GetType() == BinaryType::LogicalOr)
+            {
+                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+                op->GetLeft()->Accept(*this);
+                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
+                int savedStackSize = stackSize;
+                op->GetRight()->Accept(*this);
+                EmitNormalizeTopToBool();
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+                stackSize = savedStackSize;
+                AddOperation(StackMachineOpcode::LoadConst, 1);
+                AddOperation(StackMachineOpcode::Lavel, endLabel);
+                return;
+            }
+
             op->GetLeft()->Accept(*this);
             op->GetRight()->Accept(*this);
 
@@ -468,6 +516,10 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             case BinaryType::GreaterThan:
                 EmitComparisonBranch(StackMachineOpcode::GotoIfLessThanOrEqual, true);
                 break;
+            case BinaryType::LogicalAnd:
+            case BinaryType::LogicalOr:
+                // These are treated above
+                UNREACHABLE();
             default:
                 UNREACHABLE();
                 break;

@@ -601,7 +601,9 @@ enum class BinaryType
     LessThan,
     LessThanOrEqual,
     GreaterThanOrEqual,
-    GreaterThan
+    GreaterThan,
+    LogicalAnd,
+    LogicalOr,
 };
 
 class BinaryOperator : public Operator, public std::enable_shared_from_this<BinaryOperator>
@@ -653,7 +655,9 @@ public:
                                                  "LessThan",
                                                  "LessThanOrEqual",
                                                  "GreaterThanOrEqual",
-                                                 "GreaterThan" };
+                                                 "GreaterThan",
+                                                 "LogicalAnd",
+                                                 "LogicalOr" };
         std::ostringstream oss;
         oss << "BinaryOperator [Type = " << BinaryTypeTable[(size_t)type] << "]";
         return oss.str();

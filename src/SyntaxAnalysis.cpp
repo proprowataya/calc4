@@ -169,6 +169,39 @@ std::vector<std::pair<std::string_view, CharPosition>> Split(StringReader& reade
     return result;
 }
 
+struct DefinitionTextParts
+{
+    std::pair<std::string_view, CharPosition> name;
+    std::pair<std::string_view, CharPosition> arguments;
+    std::pair<std::string_view, CharPosition> body;
+};
+
+std::optional<DefinitionTextParts> SplitDefinitionText(StringReader& reader)
+{
+    DefinitionTextParts parts;
+
+    parts.name.second = reader.GetCurrentPosition();
+    parts.name.first = reader.ReadWhile([](char c) { return c != '|'; });
+    if (reader.Eof())
+    {
+        return std::nullopt;
+    }
+
+    reader.Read(); // '|'
+    parts.arguments.second = reader.GetCurrentPosition();
+    parts.arguments.first = reader.ReadWhile([](char c) { return c != '|'; });
+    if (reader.Eof())
+    {
+        return std::nullopt;
+    }
+
+    reader.Read(); // '|'
+    parts.body.second = reader.GetCurrentPosition();
+    parts.body.first = reader.ReadWhile([](char) { return true; });
+
+    return parts;
+}
+
 class LexerImplement
 {
 public:
@@ -283,15 +316,15 @@ public:
 
         /* ***** Split supplementaryText into three strings ***** */
         StringReader supplementaryTextReader(supplementaryText, supplementaryTextPosition);
-        auto splitted = Split(supplementaryTextReader, '|');
-        if (splitted.size() != 3)
+        auto splitted = SplitDefinitionText(supplementaryTextReader);
+        if (!splitted)
         {
             throw Exceptions::DefinitionTextNotSplittedProperlyException(position,
                                                                          supplementaryText);
         }
 
         /* ***** Split arguments ***** */
-        StringReader argumentReader(splitted[1].first, splitted[1].second);
+        StringReader argumentReader(splitted->arguments.first, splitted->arguments.second);
         auto splittedArguments = Split(argumentReader, ',');
 
         /* ***** Trim arguments (e.g. "  x " => "x") ***** */
@@ -302,7 +335,7 @@ public:
         }
 
         /* ***** Operator name ***** */
-        auto& name = splitted[0];
+        auto& name = splitted->name;
 
         /* ***** Update CompilationContext ***** */
         OperatorDefinition definition(std::string(name.first), static_cast<int>(arguments.size()));
@@ -310,7 +343,7 @@ public:
         context.AddOperatorImplement(implement);
 
         /* ***** Lex internal text ***** */
-        StringReader internalTextReader(splitted[2].first, splitted[2].second);
+        StringReader internalTextReader(splitted->body.first, splitted->body.second);
         auto tokens = LexerImplement(internalTextReader, context, arguments).Lex();
 
         /* ***** Construct token ***** */
@@ -440,6 +473,18 @@ public:
             {
                 reader.Read(2);
                 return std::make_shared<BinaryOperatorToken>(position, BinaryType::LessThanOrEqual,
+                                                             LexSupplementaryText());
+            }
+            else if (substr == "&&")
+            {
+                reader.Read(2);
+                return std::make_shared<BinaryOperatorToken>(position, BinaryType::LogicalAnd,
+                                                             LexSupplementaryText());
+            }
+            else if (substr == "||")
+            {
+                reader.Read(2);
+                return std::make_shared<BinaryOperatorToken>(position, BinaryType::LogicalOr,
                                                              LexSupplementaryText());
             }
             else if (substr == "->")

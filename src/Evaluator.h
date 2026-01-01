@@ -139,6 +139,34 @@ TNumber Evaluate(
 
         virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
         {
+            if (op->GetType() == BinaryType::LogicalAnd)
+            {
+                op->GetLeft()->Accept(*this);
+                if (value == 0)
+                {
+                    value = 0;
+                    return;
+                }
+
+                op->GetRight()->Accept(*this);
+                value = value != 0 ? 1 : 0;
+                return;
+            }
+
+            if (op->GetType() == BinaryType::LogicalOr)
+            {
+                op->GetLeft()->Accept(*this);
+                if (value != 0)
+                {
+                    value = 1;
+                    return;
+                }
+
+                op->GetRight()->Accept(*this);
+                value = value != 0 ? 1 : 0;
+                return;
+            }
+
             op->GetLeft()->Accept(*this);
             auto left = value;
             op->GetRight()->Accept(*this);
@@ -186,6 +214,11 @@ TNumber Evaluate(
                 break;
             case BinaryType::GreaterThan:
                 value = left > right ? 1 : 0;
+                break;
+            case BinaryType::LogicalAnd:
+            case BinaryType::LogicalOr:
+                // These are treated above
+                UNREACHABLE();
                 break;
             default:
                 UNREACHABLE();

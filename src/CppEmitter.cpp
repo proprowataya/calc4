@@ -342,6 +342,50 @@ public:
 
     virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
     {
+        if (op->GetType() == BinaryType::LogicalAnd || op->GetType() == BinaryType::LogicalOr)
+        {
+            int left = ProcessOperator(op->GetLeft());
+            int result = ++lastVariableNo;
+
+            Append() << TypeName<TNumber>() << ' ' << VariableName(result) << ';' << std::endl;
+            Append() << "if (" << VariableName(left) << " != 0)" << std::endl;
+            Append() << '{' << std::endl;
+
+            indent++;
+            if (op->GetType() == BinaryType::LogicalAnd)
+            {
+                int right = ProcessOperator(op->GetRight());
+                Append() << VariableName(result) << " = " << VariableName(right) << " != 0 ? 1 : 0"
+                         << ';' << std::endl;
+            }
+            else
+            {
+                Append() << VariableName(result) << " = 1" << ';' << std::endl;
+            }
+            indent--;
+
+            Append() << '}' << std::endl;
+            Append() << "else" << std::endl;
+            Append() << '{' << std::endl;
+
+            indent++;
+            if (op->GetType() == BinaryType::LogicalAnd)
+            {
+                Append() << VariableName(result) << " = 0" << ';' << std::endl;
+            }
+            else
+            {
+                int right = ProcessOperator(op->GetRight());
+                Append() << VariableName(result) << " = " << VariableName(right) << " != 0 ? 1 : 0"
+                         << ';' << std::endl;
+            }
+            indent--;
+
+            Append() << '}' << std::endl;
+            Return(result);
+            return;
+        }
+
         int left = ProcessOperator(op->GetLeft());
         int right = ProcessOperator(op->GetRight());
 
