@@ -222,7 +222,7 @@ void GenerateIR(
     /* ***** Initialize variables ***** */
     llvm::Type* integerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
     llvm::Type* usedDefinedReturnType = integerType;
-    llvm::Type* executionStateType = llvm::Type::getVoidTy(*llvmContext)->getPointerTo(0);
+    llvm::Type* executionStateType = llvm::PointerType::get(llvm::Type::getVoidTy(*llvmContext), 0);
 
     /* ***** Make function map (operator's name -> LLVM function) and the functions ***** */
     std::unordered_map<std::string, llvm::Function*> functionMap;
@@ -325,9 +325,9 @@ public:
     { GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, __VA_ARGS__), GET_LLVM_FUNCTION_ADDRESS(NAME) }
 
         llvm::Type* voidType = llvm::Type::getVoidTy(*this->context);
-        llvm::Type* voidPointerType = voidType->getPointerTo(0);
+        llvm::Type* voidPointerType = llvm::PointerType::get(voidType, 0);
         llvm::Type* integerType = builder->getIntNTy(IntegerBits<TNumber>);
-        llvm::Type* stringType = builder->getInt8Ty()->getPointerTo(0);
+        llvm::Type* stringType = llvm::PointerType::get(builder->getInt8Ty(), 0);
 
         throwZeroDivision = GET_INTERNAL_FUNCTION(
             ThrowZeroDivisionException, llvm::Type::getVoidTy(*this->context), { voidPointerType });
