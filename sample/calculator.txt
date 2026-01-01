@@ -9,8 +9,6 @@
  *   7
  */
 
-D[or|x,y|x == 0 ? (y == 0 ? 0 ? 1) ? 1]
-D[and|x,y|x == 1 ? (y == 1 ? 1 ? 0) ? 0]
 D[OutputOrigin||1024]
 D[OperatorOrigin||2048]
 D[OperatorMask||1000000000]
@@ -22,16 +20,16 @@ D[ToOperator|c|(c == 43 /* + */ ? {AddOperator} ?
                (c == 45 /* - */ ? {SubOperator} ?
                (c == 42 /* * */ ? {MultOperator} ?
                (c == 47 /* / */ ? {DivOperator} ? (0 / 0) /* Unknown operator (throw an exception) */))))]
-D[PopOperators|op|(((((L[opIndex] - 1) < {OperatorOrigin}) {or} (({op} / 100 / {OperatorMask}) > ((L[opIndex] - 1)@ / 100 / {OperatorMask})))
+D[PopOperators|op|(((((L[opIndex] - 1) < {OperatorOrigin}) || (({op} / 100 / {OperatorMask}) > ((L[opIndex] - 1)@ / 100 / {OperatorMask})))
                    ? 0
                    ? (((L[opIndex] - 1)@)->L[outputIndex])
                      ((L[outputIndex] + 1)S[outputIndex])
                      ((L[opIndex] - 1)S[opIndex])
                      ({op}{PopOperators})))]
-D[Parse||(((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? 0 ?
+D[Parse||(((L == (0 - 1)) || (L == 0) || (L == 10) || (L == 13)) ? 0 ?
          ((IS)
-          (((L == (0 - 1)) {or} (L == 0) {or} (L == 10) {or} (L == 13)) ? (((L[outputIndex] + 1)S[outputIndex])(0{PopOperators})((L[outputIndex] - 1)S[outputIndex])) ?
-          ((((L >= 48) {and} (L <= 57)) ? ((L[outputIndex]@ * 10 + (L - 48))->L[outputIndex]) ?
+          (((L == (0 - 1)) || (L == 0) || (L == 10) || (L == 13)) ? (((L[outputIndex] + 1)S[outputIndex])(0{PopOperators})((L[outputIndex] - 1)S[outputIndex])) ?
+          ((((L >= 48) && (L <= 57)) ? ((L[outputIndex]@ * 10 + (L - 48))->L[outputIndex]) ?
            ((L == 32) ? 0 ?
            ((L == 40) ? ((0->L[opIndex])((L[opIndex] + 1)S[opIndex])({Parse})) ?
            ((L == 41) ? ((L[outputIndex] + 1)S[outputIndex])((100 * {OperatorMask}){PopOperators})((L[outputIndex] - 1)S[outputIndex])((L[opIndex] - 1)S[opIndex])(0) ?
