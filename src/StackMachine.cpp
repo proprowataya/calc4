@@ -172,8 +172,11 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
             case StackMachineOpcode::GotoIfTrue:
             case StackMachineOpcode::GotoIfFalse:
             case StackMachineOpcode::GotoIfEqual:
+            case StackMachineOpcode::GotoIfNotEqual:
             case StackMachineOpcode::GotoIfLessThan:
             case StackMachineOpcode::GotoIfLessThanOrEqual:
+            case StackMachineOpcode::GotoIfGreaterThan:
+            case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                 result[index].value += startAddress;
                 break;
             default:
@@ -291,8 +294,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 case StackMachineOpcode::GotoIfTrue:
                 case StackMachineOpcode::GotoIfFalse:
                 case StackMachineOpcode::GotoIfEqual:
+                case StackMachineOpcode::GotoIfNotEqual:
                 case StackMachineOpcode::GotoIfLessThan:
                 case StackMachineOpcode::GotoIfLessThanOrEqual:
+                case StackMachineOpcode::GotoIfGreaterThan:
+                case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                     operation.value = labelMap.at(operation.value);
                     break;
                 default:
@@ -522,17 +528,9 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                     }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfEqual, label);
-                    }
-                    else
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfEqual, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfEqual
+                                            : StackMachineOpcode::GotoIfNotEqual,
+                                 label);
                     return;
                 case BinaryType::NotEqual:
                     if (IsZeroOperatorValue(binary->GetLeft()))
@@ -553,77 +551,37 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                     }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfEqual, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
-                    else
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfEqual, label);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfNotEqual
+                                            : StackMachineOpcode::GotoIfEqual,
+                                 label);
                     return;
                 case BinaryType::LessThan:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfLessThan, label);
-                    }
-                    else
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfLessThan, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfLessThan
+                                            : StackMachineOpcode::GotoIfGreaterThanOrEqual,
+                                 label);
                     return;
                 case BinaryType::LessThanOrEqual:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, label);
-                    }
-                    else
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfLessThanOrEqual
+                                            : StackMachineOpcode::GotoIfGreaterThan,
+                                 label);
                     return;
                 case BinaryType::GreaterThanOrEqual:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfLessThan, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
-                    else
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfLessThan, label);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfGreaterThanOrEqual
+                                            : StackMachineOpcode::GotoIfLessThan,
+                                 label);
                     return;
                 case BinaryType::GreaterThan:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    if (gotoIfTrue)
-                    {
-                        int endLabel = nextLabel++;
-                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, endLabel);
-                        AddOperation(StackMachineOpcode::Goto, label);
-                        AddOperation(StackMachineOpcode::Lavel, endLabel);
-                    }
-                    else
-                    {
-                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, label);
-                    }
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfGreaterThan
+                                            : StackMachineOpcode::GotoIfLessThanOrEqual,
+                                 label);
                     return;
                 case BinaryType::LogicalAnd:
                     if (gotoIfTrue)
@@ -778,8 +736,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 // Stacksize will not change
                 break;
             case StackMachineOpcode::GotoIfEqual:
+            case StackMachineOpcode::GotoIfNotEqual:
             case StackMachineOpcode::GotoIfLessThan:
             case StackMachineOpcode::GotoIfLessThanOrEqual:
+            case StackMachineOpcode::GotoIfGreaterThan:
+            case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                 AddStackSize(-2);
                 break;
             case StackMachineOpcode::Call:
@@ -942,8 +903,11 @@ TNumber ExecuteStackMachineModule(
         &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfFalse),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfEqual),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfNotEqual),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThan),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThanOrEqual),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfGreaterThan),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfGreaterThanOrEqual),
         &&COMPUTED_GOTO_LABEL_OF(Call),
         &&COMPUTED_GOTO_LABEL_OF(Return),
         &&COMPUTED_GOTO_LABEL_OF(Halt),
@@ -1165,6 +1129,16 @@ TNumber ExecuteStackMachineModule(
             COMPUTED_GOTO_NEXT_OPERATION();
         }
 
+        COMPUTED_GOTO_CASE(GotoIfNotEqual)
+        {
+            top -= 2;
+            if (*top != top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
         COMPUTED_GOTO_CASE(GotoIfLessThan)
         {
             top -= 2;
@@ -1179,6 +1153,26 @@ TNumber ExecuteStackMachineModule(
         {
             top -= 2;
             if (*top <= top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfGreaterThan)
+        {
+            top -= 2;
+            if (*top > top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfGreaterThanOrEqual)
+        {
+            top -= 2;
+            if (*top >= top[1])
             {
                 COMPUTED_GOTO_JUMP(op->value);
             }
