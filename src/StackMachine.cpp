@@ -414,222 +414,258 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
 
         virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
         {
-            auto EmitComparisonBranch = [this](StackMachineOpcode opcode, bool reverse) {
-                int ifFalse = nextLabel++, end = nextLabel++;
-
-                AddOperation(opcode, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, reverse ? 1 : 0);
-                AddOperation(StackMachineOpcode::Goto, end);
-                AddOperation(StackMachineOpcode::Lavel, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, reverse ? 0 : 1);
-                AddOperation(StackMachineOpcode::Lavel, end);
-
-                // StackSize increased by two due to two LoadConst operations.
-                // However, only one of them will be executed.
-                // We modify StackSize here.
-                AddStackSize(-1);
-            };
-
-            auto EmitNormalizeTopToBool = [this]() {
-                int ifFalse = nextLabel++, end = nextLabel++;
-
-                AddOperation(StackMachineOpcode::GotoIfFalse, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, 1);
-                AddOperation(StackMachineOpcode::Goto, end);
-                AddOperation(StackMachineOpcode::Lavel, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, 0);
-                AddOperation(StackMachineOpcode::Lavel, end);
-
-                // StackSize increased by two due to two LoadConst operations.
-                // However, only one of them will be executed.
-                // We modify StackSize here.
-                AddStackSize(-1);
-            };
-
-            if (op->GetType() == BinaryType::LogicalAnd)
-            {
-                int ifFalseLabel = nextLabel++, endLabel = nextLabel++;
-                op->GetLeft()->Accept(*this);
-                AddOperation(StackMachineOpcode::GotoIfFalse, ifFalseLabel);
-                int savedStackSize = stackSize;
-                op->GetRight()->Accept(*this);
-                EmitNormalizeTopToBool();
-                AddOperation(StackMachineOpcode::Goto, endLabel);
-                AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
-                stackSize = savedStackSize;
-                AddOperation(StackMachineOpcode::LoadConst, 0);
-                AddOperation(StackMachineOpcode::Lavel, endLabel);
-                return;
-            }
-
-            if (op->GetType() == BinaryType::LogicalOr)
-            {
-                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
-                op->GetLeft()->Accept(*this);
-                AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
-                int savedStackSize = stackSize;
-                op->GetRight()->Accept(*this);
-                EmitNormalizeTopToBool();
-                AddOperation(StackMachineOpcode::Goto, endLabel);
-                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
-                stackSize = savedStackSize;
-                AddOperation(StackMachineOpcode::LoadConst, 1);
-                AddOperation(StackMachineOpcode::Lavel, endLabel);
-                return;
-            }
-
-            op->GetLeft()->Accept(*this);
-            op->GetRight()->Accept(*this);
-
             switch (op->GetType())
             {
             case BinaryType::Add:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
                 AddOperation(StackMachineOpcode::Add);
                 break;
             case BinaryType::Sub:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
                 AddOperation(StackMachineOpcode::Sub);
                 break;
             case BinaryType::Mult:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
                 AddOperation(StackMachineOpcode::Mult);
                 break;
             case BinaryType::Div:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
                 AddOperation(option.checkZeroDivision ? StackMachineOpcode::DivChecked
                                                       : StackMachineOpcode::Div);
                 break;
             case BinaryType::Mod:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
                 AddOperation(option.checkZeroDivision ? StackMachineOpcode::ModChecked
                                                       : StackMachineOpcode::Mod);
                 break;
+
+                // For comparisons and logical operations, we generate code as "condition" to reduce
+                // redundancy and to keep short-circuit behavior.
             case BinaryType::Equal:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfEqual, false);
-                break;
             case BinaryType::NotEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfEqual, true);
-                break;
             case BinaryType::LessThan:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThan, false);
-                break;
             case BinaryType::LessThanOrEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThanOrEqual, false);
-                break;
             case BinaryType::GreaterThanOrEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThan, true);
-                break;
             case BinaryType::GreaterThan:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThanOrEqual, true);
-                break;
             case BinaryType::LogicalAnd:
             case BinaryType::LogicalOr:
-                // These are treated above
-                UNREACHABLE();
+            {
+                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+
+                EmitConditionGotoIfTrue(op, ifTrueLabel);
+                AddOperation(StackMachineOpcode::LoadConst, 0);
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+                AddOperation(StackMachineOpcode::LoadConst, 1);
+                AddOperation(StackMachineOpcode::Lavel, endLabel);
+
+                // StackSize increased by two due to two LoadConst operations.
+                // However, only one of them will be executed.
+                // We modify StackSize here.
+                AddStackSize(-1);
+                return;
+            }
             default:
                 UNREACHABLE();
                 break;
             }
         }
 
-        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
+        void EmitConditionGoto(const std::shared_ptr<const Operator>& condition, int label,
+                               bool gotoIfTrue)
         {
-            int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+            if (auto* parenthesis = dynamic_cast<const ParenthesisOperator*>(condition.get()))
+            {
+                auto& operators = parenthesis->GetOperators();
 
-            // Helper function to emit code for branch after condition evaluation
-            // - Call this after emitting a branch to ifTrueLabel or placing ifFalse label
-            auto EmitBranchBody = [this, ifTrueLabel,
-                                   endLabel](const std::shared_ptr<const Operator>& ifTrue,
-                                             const std::shared_ptr<const Operator>& ifFalse) {
-                int savedStackSize = stackSize;
-                ifFalse->Accept(*this);
-
-                auto lastOperation =
-                    std::find_if(operations.rbegin(), operations.rend(),
-                                 [](auto op) { return op.opcode != StackMachineOpcode::Lavel; });
-                if (lastOperation != operations.rend() &&
-                    lastOperation->opcode != StackMachineOpcode::Goto)
+                for (size_t i = 0; i < operators.size(); i++)
                 {
-                    // "Last opcode is Goto" means elimination of "Call" (tail-call)
-                    AddOperation(StackMachineOpcode::Goto, endLabel);
+                    if (i < operators.size() - 1)
+                    {
+                        operators[i]->Accept(*this);
+                        AddOperation(StackMachineOpcode::Pop);
+                    }
+                    else
+                    {
+                        EmitConditionGoto(operators[i], label, gotoIfTrue);
+                    }
                 }
 
-                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
-                stackSize = savedStackSize;
-                ifTrue->Accept(*this);
-                AddOperation(StackMachineOpcode::Lavel, endLabel);
-            };
+                return;
+            }
 
-            if (auto* binary = dynamic_cast<const BinaryOperator*>(op->GetCondition().get()))
+            if (auto* binary = dynamic_cast<const BinaryOperator*>(condition.get()))
             {
-                // Special optimization for comparisons
                 switch (binary->GetType())
                 {
                 case BinaryType::Equal:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfEqual, ifTrueLabel);
-                    EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+                    if (gotoIfTrue)
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfEqual, label);
+                    }
+                    else
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfEqual, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
                     return;
                 case BinaryType::NotEqual:
-                    // "a != b ? c ? d" is equivalent to "a == b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfEqual, ifTrueLabel);
-                    EmitBranchBody(op->GetIfFalse(), op->GetIfTrue());
+                    if (gotoIfTrue)
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfEqual, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
+                    else
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfEqual, label);
+                    }
                     return;
                 case BinaryType::LessThan:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfLessThan, ifTrueLabel);
-                    EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+                    if (gotoIfTrue)
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfLessThan, label);
+                    }
+                    else
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfLessThan, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
                     return;
                 case BinaryType::LessThanOrEqual:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, ifTrueLabel);
-                    EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+                    if (gotoIfTrue)
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, label);
+                    }
+                    else
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
                     return;
                 case BinaryType::GreaterThanOrEqual:
-                    // "a >= b ? c ? d" is equivalent to "a < b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfLessThan, ifTrueLabel);
-                    EmitBranchBody(op->GetIfFalse(), op->GetIfTrue());
+                    if (gotoIfTrue)
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfLessThan, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
+                    else
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfLessThan, label);
+                    }
                     return;
                 case BinaryType::GreaterThan:
-                    // "a > b ? c ? d" is equivalent to "a <= b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, ifTrueLabel);
-                    EmitBranchBody(op->GetIfFalse(), op->GetIfTrue());
+                    if (gotoIfTrue)
+                    {
+                        int endLabel = nextLabel++;
+                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, endLabel);
+                        AddOperation(StackMachineOpcode::Goto, label);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
+                    else
+                    {
+                        AddOperation(StackMachineOpcode::GotoIfLessThanOrEqual, label);
+                    }
                     return;
                 case BinaryType::LogicalAnd:
-                {
-                    int ifFalseLabel = nextLabel++;
-                    binary->GetLeft()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfFalse, ifFalseLabel);
-                    binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
-                    AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
-                    EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+                    if (gotoIfTrue)
+                    {
+                        int ifFalseLabel = nextLabel++;
+                        EmitConditionGoto(binary->GetLeft(), ifFalseLabel, false);
+                        EmitConditionGoto(binary->GetRight(), label, true);
+                        AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
+                    }
+                    else
+                    {
+                        EmitConditionGoto(binary->GetLeft(), label, false);
+                        EmitConditionGoto(binary->GetRight(), label, false);
+                    }
                     return;
-                }
                 case BinaryType::LogicalOr:
-                {
-                    int ifFalseLabel = nextLabel++;
-                    binary->GetLeft()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
-                    binary->GetRight()->Accept(*this);
-                    AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
-                    AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
-                    EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+                    if (gotoIfTrue)
+                    {
+                        EmitConditionGoto(binary->GetLeft(), label, true);
+                        EmitConditionGoto(binary->GetRight(), label, true);
+                    }
+                    else
+                    {
+                        int endLabel = nextLabel++;
+                        EmitConditionGoto(binary->GetLeft(), endLabel, true);
+                        EmitConditionGoto(binary->GetRight(), label, false);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
                     return;
-                }
                 default:
                     break;
                 }
             }
 
-            op->GetCondition()->Accept(*this);
-            AddOperation(StackMachineOpcode::GotoIfTrue, ifTrueLabel);
-            EmitBranchBody(op->GetIfTrue(), op->GetIfFalse());
+            condition->Accept(*this);
+            AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                    : StackMachineOpcode::GotoIfFalse,
+                         label);
+        }
+
+        void EmitConditionGotoIfTrue(const std::shared_ptr<const Operator>& condition,
+                                     int ifTrueLabel)
+        {
+            EmitConditionGoto(condition, ifTrueLabel, true);
+        }
+
+        void EmitConditionGotoIfFalse(const std::shared_ptr<const Operator>& condition,
+                                      int ifFalseLabel)
+        {
+            EmitConditionGoto(condition, ifFalseLabel, false);
+        }
+
+        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
+        {
+            int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+            EmitConditionGotoIfTrue(op->GetCondition(), ifTrueLabel);
+
+            int savedStackSize = stackSize;
+            op->GetIfFalse()->Accept(*this);
+
+            auto lastOperation = std::find_if(operations.rbegin(), operations.rend(), [](auto op) {
+                return op.opcode != StackMachineOpcode::Lavel;
+            });
+            if (lastOperation != operations.rend() &&
+                lastOperation->opcode != StackMachineOpcode::Goto)
+            {
+                // "Last opcode is Goto" means elimination of "Call" (tail-call)
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+            }
+
+            AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+            stackSize = savedStackSize;
+            op->GetIfTrue()->Accept(*this);
+            AddOperation(StackMachineOpcode::Lavel, endLabel);
         };
 
         virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
