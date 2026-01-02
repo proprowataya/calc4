@@ -504,6 +504,22 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 switch (binary->GetType())
                 {
                 case BinaryType::Equal:
+                    if (IsZeroOperatorValue(binary->GetLeft()))
+                    {
+                        binary->GetRight()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfFalse
+                                                : StackMachineOpcode::GotoIfTrue,
+                                     label);
+                        return;
+                    }
+                    if (IsZeroOperatorValue(binary->GetRight()))
+                    {
+                        binary->GetLeft()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfFalse
+                                                : StackMachineOpcode::GotoIfTrue,
+                                     label);
+                        return;
+                    }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
                     if (gotoIfTrue)
@@ -519,6 +535,22 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                     }
                     return;
                 case BinaryType::NotEqual:
+                    if (IsZeroOperatorValue(binary->GetLeft()))
+                    {
+                        binary->GetRight()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                                : StackMachineOpcode::GotoIfFalse,
+                                     label);
+                        return;
+                    }
+                    if (IsZeroOperatorValue(binary->GetRight()))
+                    {
+                        binary->GetLeft()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                                : StackMachineOpcode::GotoIfFalse,
+                                     label);
+                        return;
+                    }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
                     if (gotoIfTrue)
@@ -768,6 +800,21 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 UNREACHABLE();
                 break;
             }
+        }
+
+        bool IsZeroOperatorValue(const std::shared_ptr<const Operator>& op) const
+        {
+            if (dynamic_cast<const ZeroOperator*>(op.get()) != nullptr)
+            {
+                return true;
+            }
+
+            if (auto* precomputed = dynamic_cast<const PrecomputedOperator*>(op.get()))
+            {
+                return precomputed->GetValue<TNumber>() == 0;
+            }
+
+            return false;
         }
 
         int GetOrCreateVariableIndex(const std::string& variableName)
