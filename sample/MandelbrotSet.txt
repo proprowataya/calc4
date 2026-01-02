@@ -47,7 +47,6 @@ D[LoopLimit||1000]
  *****/
 D[getMax|x,y|x>y?x?y]
 D[newline||10P]
-D[or|x,y|x == 0 ? (y == 0 ? 0 ? 1) ? 1]
 
 /*****
  *
@@ -131,8 +130,8 @@ D[getColor|v|(v < (256 - 232))?(255 - v)?232]
 
 // Print integer
 D[printIntImpl|n,divisor,printZero|({divisor} != 0) ?
-                                   ((((n / {divisor})S != 0) {or} {printZero} ? ((48 + L)P) ? 0)
-                                    ((n % {divisor}){printIntImpl}({divisor} / 10){printIntImpl}({printZero}{or}(L != 0)))) ?
+                                   ((((n / {divisor})S != 0) || {printZero} ? ((48 + L)P) ? 0)
+                                    ((n % {divisor}){printIntImpl}({divisor} / 10){printIntImpl}({printZero}||(L != 0)))) ?
                                    0]
 D[print|n|n{printIntImpl}1000{printIntImpl}0]
 
