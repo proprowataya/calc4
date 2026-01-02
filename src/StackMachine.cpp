@@ -13,6 +13,7 @@
 #include "ExecutionState.h"
 #include "Operators.h"
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -268,6 +269,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             std::vector<StackMachineOperation> newVector;
             std::unordered_map<int, int> labelMap;
 
+            // First pass removes label operations and records their address.
             for (auto& operation : operations)
             {
                 switch (operation.opcode)
@@ -284,6 +286,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 }
             }
 
+            // Second pass resolves label operands to absolute indices.
             for (size_t i = 0; i < newVector.size(); i++)
             {
                 auto& operation = newVector[i];
@@ -306,6 +309,62 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 }
             }
 
+            // Third pass compresses Goto chains and replaces Goto with Return when the target is
+            // Return.
+            //  - visitId is the marker for the current walk.
+            //  - visited stores the last visit id for each index.
+            std::vector<uint32_t> visited(newVector.size(), 0);
+            uint32_t visitId = 1;
+            for (size_t i = 0; i < newVector.size(); i++)
+            {
+                auto& operation = newVector[i];
+
+                if (operation.opcode != StackMachineOpcode::Goto)
+                {
+                    continue;
+                }
+
+                // Get a new visit id for this walk.
+                visitId++;
+                if (visitId == 0)
+                {
+                    // visitId overflowed to zero so we reset markers to avoid false matches.
+                    std::fill(visited.begin(), visited.end(), 0);
+                    visitId = 1;
+                }
+
+                int target = operation.value;
+                while (true)
+                {
+                    if (visited[target] == visitId)
+                    {
+                        // Cycle detected so we keep the original Goto.
+                        break;
+                    }
+                    visited[target] = visitId;
+
+                    auto& targetOperation = newVector[target];
+                    if (targetOperation.opcode == StackMachineOpcode::Goto)
+                    {
+                        // Follow the next Goto in the chain.
+                        target = targetOperation.value;
+                    }
+                    else if (targetOperation.opcode == StackMachineOpcode::Return)
+                    {
+                        // Replace Goto with Return to skip the jump.
+                        operation = targetOperation;
+                        break;
+                    }
+                    else
+                    {
+                        // Replace Goto with the final target.
+                        operation.value = target;
+                        break;
+                    }
+                }
+            }
+
+            // Populate operations with resolved instructions.
             operations = std::move(newVector);
         }
 
