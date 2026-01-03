@@ -92,14 +92,14 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
 #endif // ENABLE_JIT
                      })
                 {
-                    result.emplace_back(base, IntegerType::Int32, executor, checkZeroDivision,
-                                        optimize);
-                    result.emplace_back(base, IntegerType::Int64, executor, checkZeroDivision,
-                                        optimize);
+                    result.emplace_back(base, IntegerType::Int32, executor, optimize,
+                                        checkZeroDivision);
+                    result.emplace_back(base, IntegerType::Int64, executor, optimize,
+                                        checkZeroDivision);
 
 #ifdef ENABLE_INT128
-                    result.emplace_back(base, IntegerType::Int128, executor, checkZeroDivision,
-                                        optimize);
+                    result.emplace_back(base, IntegerType::Int128, executor, optimize,
+                                        checkZeroDivision);
 #endif // ENABLE_INT128
 
 #ifdef ENABLE_GMP
@@ -107,8 +107,8 @@ std::vector<TTestCase> GenerateTestCases(const TContainer& testCaseBases)
                     if (executor != ExecutorType::JIT)
 #endif // ENABLE_JIT
                     {
-                        result.emplace_back(base, IntegerType::GMP, executor, checkZeroDivision,
-                                            optimize);
+                        result.emplace_back(base, IntegerType::GMP, executor, optimize,
+                                            checkZeroDivision);
                     }
 #endif // ENABLE_GMP
                 }
