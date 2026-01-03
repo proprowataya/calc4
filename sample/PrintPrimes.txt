@@ -9,10 +9,9 @@ D[isPrimeImpl|n, i|i * i > n ?
                    n {isPrimeImpl} (i + 1))]
 D[isPrime|n|n {isPrimeImpl} 2]
 
-D[or|x,y|x == 0 ? (y == 0 ? 0 ? 1) ? 1]
 D[printIntImpl|n,divisor,printZero|({divisor} != 0) ?
-                                   ((((n / {divisor})S != 0) {or} {printZero} ? ((48 + L)P) ? 0)
-                                    ((n % {divisor}){printIntImpl}({divisor} / 10){printIntImpl}({printZero}{or}(L != 0)))) ?
+                                   ((((n / {divisor})S != 0) || {printZero} ? ((48 + L)P) ? 0)
+                                    ((n % {divisor}){printIntImpl}({divisor} / 10){printIntImpl}({printZero}||(L != 0)))) ?
                                    0]
 D[print|n|n{printIntImpl}1000{printIntImpl}0]
 

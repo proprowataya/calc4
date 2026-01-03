@@ -13,6 +13,7 @@
 #include "ExecutionState.h"
 #include "Operators.h"
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -170,9 +171,13 @@ std::pair<std::vector<StackMachineOperation>, std::vector<int>> StackMachineModu
             {
             case StackMachineOpcode::Goto:
             case StackMachineOpcode::GotoIfTrue:
+            case StackMachineOpcode::GotoIfFalse:
             case StackMachineOpcode::GotoIfEqual:
+            case StackMachineOpcode::GotoIfNotEqual:
             case StackMachineOpcode::GotoIfLessThan:
             case StackMachineOpcode::GotoIfLessThanOrEqual:
+            case StackMachineOpcode::GotoIfGreaterThan:
+            case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                 result[index].value += startAddress;
                 break;
             default:
@@ -264,6 +269,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             std::vector<StackMachineOperation> newVector;
             std::unordered_map<int, int> labelMap;
 
+            // First pass removes label operations and records their address.
             for (auto& operation : operations)
             {
                 switch (operation.opcode)
@@ -280,6 +286,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 }
             }
 
+            // Second pass resolves label operands to absolute indices.
             for (size_t i = 0; i < newVector.size(); i++)
             {
                 auto& operation = newVector[i];
@@ -288,9 +295,13 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 {
                 case StackMachineOpcode::Goto:
                 case StackMachineOpcode::GotoIfTrue:
+                case StackMachineOpcode::GotoIfFalse:
                 case StackMachineOpcode::GotoIfEqual:
+                case StackMachineOpcode::GotoIfNotEqual:
                 case StackMachineOpcode::GotoIfLessThan:
                 case StackMachineOpcode::GotoIfLessThanOrEqual:
+                case StackMachineOpcode::GotoIfGreaterThan:
+                case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                     operation.value = labelMap.at(operation.value);
                     break;
                 default:
@@ -298,6 +309,62 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 }
             }
 
+            // Third pass compresses Goto chains and replaces Goto with Return when the target is
+            // Return.
+            //  - visitId is the marker for the current walk.
+            //  - visited stores the last visit id for each index.
+            std::vector<uint32_t> visited(newVector.size(), 0);
+            uint32_t visitId = 1;
+            for (size_t i = 0; i < newVector.size(); i++)
+            {
+                auto& operation = newVector[i];
+
+                if (operation.opcode != StackMachineOpcode::Goto)
+                {
+                    continue;
+                }
+
+                // Get a new visit id for this walk.
+                visitId++;
+                if (visitId == 0)
+                {
+                    // visitId overflowed to zero so we reset markers to avoid false matches.
+                    std::fill(visited.begin(), visited.end(), 0);
+                    visitId = 1;
+                }
+
+                int target = operation.value;
+                while (true)
+                {
+                    if (visited[target] == visitId)
+                    {
+                        // Cycle detected so we keep the original Goto.
+                        break;
+                    }
+                    visited[target] = visitId;
+
+                    auto& targetOperation = newVector[target];
+                    if (targetOperation.opcode == StackMachineOpcode::Goto)
+                    {
+                        // Follow the next Goto in the chain.
+                        target = targetOperation.value;
+                    }
+                    else if (targetOperation.opcode == StackMachineOpcode::Return)
+                    {
+                        // Replace Goto with Return to skip the jump.
+                        operation = targetOperation;
+                        break;
+                    }
+                    else
+                    {
+                        // Replace Goto with the final target.
+                        operation.value = target;
+                        break;
+                    }
+                }
+            }
+
+            // Populate operations with resolved instructions.
             operations = std::move(newVector);
         }
 
@@ -412,146 +479,242 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
 
         virtual void Visit(const std::shared_ptr<const BinaryOperator>& op) override
         {
-            auto EmitComparisonBranch = [this](StackMachineOpcode opcode, bool reverse) {
-                int ifFalse = nextLabel++, end = nextLabel++;
+            switch (op->GetType())
+            {
+            case BinaryType::Add:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
+                AddOperation(StackMachineOpcode::Add);
+                break;
+            case BinaryType::Sub:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
+                AddOperation(StackMachineOpcode::Sub);
+                break;
+            case BinaryType::Mult:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
+                AddOperation(StackMachineOpcode::Mult);
+                break;
+            case BinaryType::Div:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
+                AddOperation(option.checkZeroDivision ? StackMachineOpcode::DivChecked
+                                                      : StackMachineOpcode::Div);
+                break;
+            case BinaryType::Mod:
+                op->GetLeft()->Accept(*this);
+                op->GetRight()->Accept(*this);
+                AddOperation(option.checkZeroDivision ? StackMachineOpcode::ModChecked
+                                                      : StackMachineOpcode::Mod);
+                break;
 
-                AddOperation(opcode, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, reverse ? 1 : 0);
-                AddOperation(StackMachineOpcode::Goto, end);
-                AddOperation(StackMachineOpcode::Lavel, ifFalse);
-                AddOperation(StackMachineOpcode::LoadConst, reverse ? 0 : 1);
-                AddOperation(StackMachineOpcode::Lavel, end);
+                // For comparisons and logical operations, we generate code as "condition" to reduce
+                // redundancy and to keep short-circuit behavior.
+            case BinaryType::Equal:
+            case BinaryType::NotEqual:
+            case BinaryType::LessThan:
+            case BinaryType::LessThanOrEqual:
+            case BinaryType::GreaterThanOrEqual:
+            case BinaryType::GreaterThan:
+            case BinaryType::LogicalAnd:
+            case BinaryType::LogicalOr:
+            {
+                int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+
+                EmitConditionGotoIfTrue(op, ifTrueLabel);
+                AddOperation(StackMachineOpcode::LoadConst, 0);
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+                AddOperation(StackMachineOpcode::LoadConst, 1);
+                AddOperation(StackMachineOpcode::Lavel, endLabel);
 
                 // StackSize increased by two due to two LoadConst operations.
                 // However, only one of them will be executed.
                 // We modify StackSize here.
                 AddStackSize(-1);
-            };
-
-            op->GetLeft()->Accept(*this);
-            op->GetRight()->Accept(*this);
-
-            switch (op->GetType())
-            {
-            case BinaryType::Add:
-                AddOperation(StackMachineOpcode::Add);
-                break;
-            case BinaryType::Sub:
-                AddOperation(StackMachineOpcode::Sub);
-                break;
-            case BinaryType::Mult:
-                AddOperation(StackMachineOpcode::Mult);
-                break;
-            case BinaryType::Div:
-                AddOperation(option.checkZeroDivision ? StackMachineOpcode::DivChecked
-                                                      : StackMachineOpcode::Div);
-                break;
-            case BinaryType::Mod:
-                AddOperation(option.checkZeroDivision ? StackMachineOpcode::ModChecked
-                                                      : StackMachineOpcode::Mod);
-                break;
-            case BinaryType::Equal:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfEqual, false);
-                break;
-            case BinaryType::NotEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfEqual, true);
-                break;
-            case BinaryType::LessThan:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThan, false);
-                break;
-            case BinaryType::LessThanOrEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThanOrEqual, false);
-                break;
-            case BinaryType::GreaterThanOrEqual:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThan, true);
-                break;
-            case BinaryType::GreaterThan:
-                EmitComparisonBranch(StackMachineOpcode::GotoIfLessThanOrEqual, true);
-                break;
+                return;
+            }
             default:
                 UNREACHABLE();
                 break;
             }
         }
 
-        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
+        void EmitConditionGoto(const std::shared_ptr<const Operator>& condition, int label,
+                               bool gotoIfTrue)
         {
-            int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+            if (auto* parenthesis = dynamic_cast<const ParenthesisOperator*>(condition.get()))
+            {
+                auto& operators = parenthesis->GetOperators();
 
-            // Helper function to emit code for branch
-            // - Call this after generating evaluation code of condition operator
-            auto Emit = [this, ifTrueLabel,
-                         endLabel](StackMachineOpcode opcode,
-                                   const std::shared_ptr<const Operator>& ifTrue,
-                                   const std::shared_ptr<const Operator>& ifFalse) {
-                AddOperation(opcode, ifTrueLabel);
-
-                int savedStackSize = stackSize;
-                ifFalse->Accept(*this);
-
-                auto lastOperation =
-                    std::find_if(operations.rbegin(), operations.rend(),
-                                 [](auto op) { return op.opcode != StackMachineOpcode::Lavel; });
-                if (lastOperation != operations.rend() &&
-                    lastOperation->opcode != StackMachineOpcode::Goto)
+                for (size_t i = 0; i < operators.size(); i++)
                 {
-                    // "Last opcode is Goto" means elimination of "Call" (tail-call)
-                    AddOperation(StackMachineOpcode::Goto, endLabel);
+                    if (i < operators.size() - 1)
+                    {
+                        operators[i]->Accept(*this);
+                        AddOperation(StackMachineOpcode::Pop);
+                    }
+                    else
+                    {
+                        EmitConditionGoto(operators[i], label, gotoIfTrue);
+                    }
                 }
 
-                AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
-                stackSize = savedStackSize;
-                ifTrue->Accept(*this);
-                AddOperation(StackMachineOpcode::Lavel, endLabel);
-            };
+                return;
+            }
 
-            if (auto* binary = dynamic_cast<const BinaryOperator*>(op->GetCondition().get()))
+            if (auto* binary = dynamic_cast<const BinaryOperator*>(condition.get()))
             {
-                // Special optimiztion for comparisons
                 switch (binary->GetType())
                 {
                 case BinaryType::Equal:
+                    if (IsZeroOperatorValue(binary->GetLeft()))
+                    {
+                        binary->GetRight()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfFalse
+                                                : StackMachineOpcode::GotoIfTrue,
+                                     label);
+                        return;
+                    }
+                    if (IsZeroOperatorValue(binary->GetRight()))
+                    {
+                        binary->GetLeft()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfFalse
+                                                : StackMachineOpcode::GotoIfTrue,
+                                     label);
+                        return;
+                    }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfEqual, op->GetIfTrue(), op->GetIfFalse());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfEqual
+                                            : StackMachineOpcode::GotoIfNotEqual,
+                                 label);
                     return;
                 case BinaryType::NotEqual:
-                    // "a != b ? c ? d" is equivalent to "a == b ? d ? c"
+                    if (IsZeroOperatorValue(binary->GetLeft()))
+                    {
+                        binary->GetRight()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                                : StackMachineOpcode::GotoIfFalse,
+                                     label);
+                        return;
+                    }
+                    if (IsZeroOperatorValue(binary->GetRight()))
+                    {
+                        binary->GetLeft()->Accept(*this);
+                        AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                                : StackMachineOpcode::GotoIfFalse,
+                                     label);
+                        return;
+                    }
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfEqual, op->GetIfFalse(), op->GetIfTrue());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfNotEqual
+                                            : StackMachineOpcode::GotoIfEqual,
+                                 label);
                     return;
                 case BinaryType::LessThan:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThan, op->GetIfTrue(), op->GetIfFalse());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfLessThan
+                                            : StackMachineOpcode::GotoIfGreaterThanOrEqual,
+                                 label);
                     return;
                 case BinaryType::LessThanOrEqual:
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op->GetIfTrue(),
-                         op->GetIfFalse());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfLessThanOrEqual
+                                            : StackMachineOpcode::GotoIfGreaterThan,
+                                 label);
                     return;
                 case BinaryType::GreaterThanOrEqual:
-                    // "a >= b ? c ? d" is equivalent to "a < b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThan, op->GetIfFalse(), op->GetIfTrue());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfGreaterThanOrEqual
+                                            : StackMachineOpcode::GotoIfLessThan,
+                                 label);
                     return;
                 case BinaryType::GreaterThan:
-                    // "a > b ? c ? d" is equivalent to "a <= b ? d ? c"
                     binary->GetLeft()->Accept(*this);
                     binary->GetRight()->Accept(*this);
-                    Emit(StackMachineOpcode::GotoIfLessThanOrEqual, op->GetIfFalse(),
-                         op->GetIfTrue());
+                    AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfGreaterThan
+                                            : StackMachineOpcode::GotoIfLessThanOrEqual,
+                                 label);
+                    return;
+                case BinaryType::LogicalAnd:
+                    if (gotoIfTrue)
+                    {
+                        int ifFalseLabel = nextLabel++;
+                        EmitConditionGoto(binary->GetLeft(), ifFalseLabel, false);
+                        EmitConditionGoto(binary->GetRight(), label, true);
+                        AddOperation(StackMachineOpcode::Lavel, ifFalseLabel);
+                    }
+                    else
+                    {
+                        EmitConditionGoto(binary->GetLeft(), label, false);
+                        EmitConditionGoto(binary->GetRight(), label, false);
+                    }
+                    return;
+                case BinaryType::LogicalOr:
+                    if (gotoIfTrue)
+                    {
+                        EmitConditionGoto(binary->GetLeft(), label, true);
+                        EmitConditionGoto(binary->GetRight(), label, true);
+                    }
+                    else
+                    {
+                        int endLabel = nextLabel++;
+                        EmitConditionGoto(binary->GetLeft(), endLabel, true);
+                        EmitConditionGoto(binary->GetRight(), label, false);
+                        AddOperation(StackMachineOpcode::Lavel, endLabel);
+                    }
                     return;
                 default:
                     break;
                 }
             }
 
-            op->GetCondition()->Accept(*this);
-            Emit(StackMachineOpcode::GotoIfTrue, op->GetIfTrue(), op->GetIfFalse());
+            condition->Accept(*this);
+            AddOperation(gotoIfTrue ? StackMachineOpcode::GotoIfTrue
+                                    : StackMachineOpcode::GotoIfFalse,
+                         label);
+        }
+
+        void EmitConditionGotoIfTrue(const std::shared_ptr<const Operator>& condition,
+                                     int ifTrueLabel)
+        {
+            EmitConditionGoto(condition, ifTrueLabel, true);
+        }
+
+        void EmitConditionGotoIfFalse(const std::shared_ptr<const Operator>& condition,
+                                      int ifFalseLabel)
+        {
+            EmitConditionGoto(condition, ifFalseLabel, false);
+        }
+
+        virtual void Visit(const std::shared_ptr<const ConditionalOperator>& op) override
+        {
+            int ifTrueLabel = nextLabel++, endLabel = nextLabel++;
+            EmitConditionGotoIfTrue(op->GetCondition(), ifTrueLabel);
+
+            int savedStackSize = stackSize;
+            op->GetIfFalse()->Accept(*this);
+
+            auto lastOperation = std::find_if(operations.rbegin(), operations.rend(), [](auto op) {
+                return op.opcode != StackMachineOpcode::Lavel;
+            });
+            if (lastOperation != operations.rend() &&
+                lastOperation->opcode != StackMachineOpcode::Goto)
+            {
+                // "Last opcode is Goto" means elimination of "Call" (tail-call)
+                AddOperation(StackMachineOpcode::Goto, endLabel);
+            }
+
+            AddOperation(StackMachineOpcode::Lavel, ifTrueLabel);
+            stackSize = savedStackSize;
+            op->GetIfTrue()->Accept(*this);
+            AddOperation(StackMachineOpcode::Lavel, endLabel);
         };
 
         virtual void Visit(const std::shared_ptr<const UserDefinedOperator>& op) override
@@ -620,6 +783,7 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
             case StackMachineOpcode::Mod:
             case StackMachineOpcode::ModChecked:
             case StackMachineOpcode::GotoIfTrue:
+            case StackMachineOpcode::GotoIfFalse:
             case StackMachineOpcode::Return:
             case StackMachineOpcode::Halt:
                 AddStackSize(-1);
@@ -631,8 +795,11 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 // Stacksize will not change
                 break;
             case StackMachineOpcode::GotoIfEqual:
+            case StackMachineOpcode::GotoIfNotEqual:
             case StackMachineOpcode::GotoIfLessThan:
             case StackMachineOpcode::GotoIfLessThanOrEqual:
+            case StackMachineOpcode::GotoIfGreaterThan:
+            case StackMachineOpcode::GotoIfGreaterThanOrEqual:
                 AddStackSize(-2);
                 break;
             case StackMachineOpcode::Call:
@@ -653,6 +820,21 @@ StackMachineModule<TNumber> GenerateStackMachineModule(
                 UNREACHABLE();
                 break;
             }
+        }
+
+        bool IsZeroOperatorValue(const std::shared_ptr<const Operator>& op) const
+        {
+            if (dynamic_cast<const ZeroOperator*>(op.get()) != nullptr)
+            {
+                return true;
+            }
+
+            if (auto* precomputed = dynamic_cast<const PrecomputedOperator*>(op.get()))
+            {
+                return precomputed->GetValue<TNumber>() == 0;
+            }
+
+            return false;
         }
 
         int GetOrCreateVariableIndex(const std::string& variableName)
@@ -778,9 +960,13 @@ TNumber ExecuteStackMachineModule(
         &&COMPUTED_GOTO_LABEL_OF(ModChecked),
         &&COMPUTED_GOTO_LABEL_OF(Goto),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfTrue),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfFalse),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfEqual),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfNotEqual),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThan),
         &&COMPUTED_GOTO_LABEL_OF(GotoIfLessThanOrEqual),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfGreaterThan),
+        &&COMPUTED_GOTO_LABEL_OF(GotoIfGreaterThanOrEqual),
         &&COMPUTED_GOTO_LABEL_OF(Call),
         &&COMPUTED_GOTO_LABEL_OF(Return),
         &&COMPUTED_GOTO_LABEL_OF(Halt),
@@ -982,10 +1168,30 @@ TNumber ExecuteStackMachineModule(
             COMPUTED_GOTO_NEXT_OPERATION();
         }
 
+        COMPUTED_GOTO_CASE(GotoIfFalse)
+        {
+            top--;
+            if (*top == 0)
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
         COMPUTED_GOTO_CASE(GotoIfEqual)
         {
             top -= 2;
             if (*top == top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfNotEqual)
+        {
+            top -= 2;
+            if (*top != top[1])
             {
                 COMPUTED_GOTO_JUMP(op->value);
             }
@@ -1006,6 +1212,26 @@ TNumber ExecuteStackMachineModule(
         {
             top -= 2;
             if (*top <= top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfGreaterThan)
+        {
+            top -= 2;
+            if (*top > top[1])
+            {
+                COMPUTED_GOTO_JUMP(op->value);
+            }
+            COMPUTED_GOTO_NEXT_OPERATION();
+        }
+
+        COMPUTED_GOTO_CASE(GotoIfGreaterThanOrEqual)
+        {
+            top -= 2;
+            if (*top >= top[1])
             {
                 COMPUTED_GOTO_JUMP(op->value);
             }

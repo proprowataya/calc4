@@ -152,8 +152,58 @@ public:
         std::shared_ptr<const Operator> right = Precompute(op->GetRight());
 
         TNumber leftValue, rightValue;
-        if (TryGetPrecomputedValue(left, &leftValue) &&
-            TryGetPrecomputedValue(right, &rightValue) &&
+        bool leftIsPrecomputed = TryGetPrecomputedValue(left, &leftValue);
+        bool rightIsPrecomputed = TryGetPrecomputedValue(right, &rightValue);
+
+        if (op->GetType() == BinaryType::LogicalAnd)
+        {
+            if (leftIsPrecomputed)
+            {
+                if (leftValue == 0)
+                {
+                    value = PrecomputedOperator::Create(static_cast<TNumber>(0));
+                    return;
+                }
+                if (rightIsPrecomputed)
+                {
+                    value =
+                        PrecomputedOperator::Create(static_cast<TNumber>(rightValue != 0 ? 1 : 0));
+                    return;
+                }
+                value = BinaryOperator::Create(right,
+                                               PrecomputedOperator::Create(static_cast<TNumber>(0)),
+                                               BinaryType::NotEqual);
+                return;
+            }
+            value = BinaryOperator::Create(left, right, op->GetType());
+            return;
+        }
+
+        if (op->GetType() == BinaryType::LogicalOr)
+        {
+            if (leftIsPrecomputed)
+            {
+                if (leftValue != 0)
+                {
+                    value = PrecomputedOperator::Create(static_cast<TNumber>(1));
+                    return;
+                }
+                if (rightIsPrecomputed)
+                {
+                    value =
+                        PrecomputedOperator::Create(static_cast<TNumber>(rightValue != 0 ? 1 : 0));
+                    return;
+                }
+                value = BinaryOperator::Create(right,
+                                               PrecomputedOperator::Create(static_cast<TNumber>(0)),
+                                               BinaryType::NotEqual);
+                return;
+            }
+            value = BinaryOperator::Create(left, right, op->GetType());
+            return;
+        }
+
+        if (leftIsPrecomputed && rightIsPrecomputed &&
             !((op->GetType() == BinaryType::Div || op->GetType() == BinaryType::Mod) &&
               rightValue == 0))
         {
@@ -193,6 +243,11 @@ public:
                 break;
             case BinaryType::GreaterThan:
                 result = (leftValue > rightValue) ? 1 : 0;
+                break;
+            case BinaryType::LogicalAnd:
+            case BinaryType::LogicalOr:
+                // These are treated above
+                UNREACHABLE();
                 break;
             default:
                 UNREACHABLE();
