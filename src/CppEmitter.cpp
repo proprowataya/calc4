@@ -44,6 +44,49 @@ namespace
 constexpr std::string_view IndentText = "    "sv;
 constexpr std::string_view MainOperatorName = "main_operator"sv;
 
+inline bool IsAsciiAlnum(unsigned char c)
+{
+    return (c >= static_cast<unsigned char>('0') && c <= static_cast<unsigned char>('9')) ||
+        (c >= static_cast<unsigned char>('A') && c <= static_cast<unsigned char>('Z')) ||
+        (c >= static_cast<unsigned char>('a') && c <= static_cast<unsigned char>('z'));
+}
+
+inline char HexDigit(unsigned int v)
+{
+    static constexpr char Digits[] = "0123456789ABCDEF";
+    return Digits[v & 0xF];
+}
+
+// Mangle an arbitrary Calc4 identifier (variable or operator name) into a C++ identifier-safe
+// suffix. This must be injective to avoid silently aliasing different Calc4 identifiers.
+//
+// Rules:
+//   - [A-Za-z0-9] are preserved.
+//   - '_' is encoded as '__' (critical to avoid collisions with the underscore prefix below).
+//   - Other bytes are encoded as '_' + two uppercase hex digits.
+//
+// Examples:
+//   "/"   -> "_2F"
+//   "_2F" -> "__2F" (does not collide with "/")
+void AppendMangledIdentifierSuffix(std::ostream& os, std::string_view raw)
+{
+    for (unsigned char c : raw)
+    {
+        if (IsAsciiAlnum(c))
+        {
+            os << static_cast<char>(c);
+        }
+        else if (c == static_cast<unsigned char>('_'))
+        {
+            os << "__";
+        }
+        else
+        {
+            os << '_' << HexDigit(c >> 4) << HexDigit(c);
+        }
+    }
+}
+
 /*****/
 
 struct OperatorInformation
@@ -129,7 +172,9 @@ struct UserDefinedVariableName
 
 std::ostream& operator<<(std::ostream& ostream, UserDefinedVariableName name)
 {
-    return ostream << "user_defined_var_" << name.name;
+    ostream << "user_defined_var_";
+    AppendMangledIdentifierSuffix(ostream, name.name);
+    return ostream;
 }
 
 struct ArgumentName
@@ -151,7 +196,9 @@ struct UserDefinedOperatorName
 
 std::ostream& operator<<(std::ostream& ostream, const UserDefinedOperatorName& name)
 {
-    return ostream << "user_defined_operator_" << name.definition.GetName();
+    ostream << "user_defined_operator_";
+    AppendMangledIdentifierSuffix(ostream, name.definition.GetName());
+    return ostream;
 }
 
 template<typename TNumber>
