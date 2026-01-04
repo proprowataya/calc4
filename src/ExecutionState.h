@@ -53,7 +53,10 @@ public:
         if (index < buffer.length())
         {
             nextIndex++;
-            return static_cast<int>(buffer[index]);
+            // NOTE: buffer[index] is a char. When 'char' is signed (common on x86), values in
+            // 0x80..0xFF would be negative and could collide with EOF (-1). Align with
+            // std::istream::get() semantics: return 0..255 or EOF.
+            return static_cast<int>(static_cast<unsigned char>(buffer[index]));
         }
 
         return -1;
