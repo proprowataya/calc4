@@ -128,6 +128,10 @@ ExecutionTestCaseBase ExecutionTestCaseBases[] = {
     { "1+2+I", "A", 68 },
     { "D[Input||I]{Input}", "A", 65 },
     { "I", "", -1 },
+
+    // Byte I/O: non-ASCII bytes must be preserved
+    { "128P255P0", "", 0, "\x80\xFF" },
+    { "I", "\xFF", 255 },
     // clang-format on
 };
 
