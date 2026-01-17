@@ -709,47 +709,6 @@ struct NameResolver
     }
 };
 
-// TODO: Remove duplicate code in CppEmitter, Jit, and WasmTextEmitter
-void GatherVariableNamesCore(const std::shared_ptr<const Operator>& op,
-                             std::set<std::string_view>& result)
-{
-    if (auto loadVariable = dynamic_cast<const LoadVariableOperator*>(op.get()))
-    {
-        result.emplace(loadVariable->GetVariableName());
-    }
-    else if (auto storeVariable = dynamic_cast<const StoreVariableOperator*>(op.get()))
-    {
-        result.emplace(storeVariable->GetVariableName());
-    }
-    else if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(op.get()))
-    {
-        for (auto& child : parenthesis->GetOperators())
-        {
-            GatherVariableNamesCore(child, result);
-        }
-    }
-
-    for (auto& operand : op->GetOperands())
-    {
-        GatherVariableNamesCore(operand, result);
-    }
-}
-
-// TODO: Remove duplicate code in CppEmitter, Jit, and WasmTextEmitter
-std::set<std::string_view> GatherVariableNames(const std::shared_ptr<const Operator>& mainOp,
-                                               const CompilationContext& context)
-{
-    std::set<std::string_view> result;
-    GatherVariableNamesCore(mainOp, result);
-
-    for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
-    {
-        GatherVariableNamesCore(it->second.GetOperator(), result);
-    }
-
-    return result;
-}
-
 template<typename TNumber>
 class ValueEmitter : public OperatorVisitor
 {
