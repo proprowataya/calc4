@@ -111,7 +111,7 @@ TEST(CodegenWasmIntegrationTest, Smoke)
 
     if (!fs::exists(scriptPath))
     {
-        FAIL() << "run_wat.mjs not found: " << scriptPath.string();
+        GTEST_SKIP() << "run_wat.mjs not found: " << scriptPath.string();
     }
 
     const std::string_view node = GetNodeExecutable();
@@ -125,8 +125,9 @@ TEST(CodegenWasmIntegrationTest, Smoke)
         CommandResult r = RunCommandRedirectToFile({ node, "--version" }, out);
         if (r.exitCode != 0)
         {
-            FAIL() << "Node.js is not available (cannot run '" << node << " --version'). Output:\n"
-                   << r.output;
+            GTEST_SKIP() << "Node.js is not available (cannot run '" << node
+                         << " --version'). Output:\n"
+                         << r.output;
         }
     }
 
@@ -159,7 +160,7 @@ TEST(CodegenWasmIntegrationTest, Smoke)
             // Exit code 2 is a special signal: a required dependency (wat2wasm) is missing.
             if (r.exitCode == 2)
             {
-                FAIL() << r.output;
+                GTEST_SKIP() << r.output;
             }
 
             ASSERT_EQ(r.exitCode, 0) << "Command failed.\nCommand: " << r.command << "\nOutput:\n"
@@ -176,7 +177,7 @@ TEST(CodegenWasmIntegrationTest, Smoke)
 TEST(CodegenCppIntegrationTest, Smoke)
 {
 #if defined(_MSC_VER)
-    FAIL() << "C++ codegen integration test is not available on MSVC toolchains.";
+    GTEST_SKIP() << "C++ codegen integration test is not available on MSVC toolchains.";
 #else
     namespace fs = std::filesystem;
     using namespace std::literals::string_literals;
@@ -192,9 +193,9 @@ TEST(CodegenCppIntegrationTest, Smoke)
         CommandResult r = RunCommandRedirectToFile({ compiler, "--version" }, out);
         if (r.exitCode != 0)
         {
-            FAIL() << "C++ compiler is not available (cannot run '" << compiler
-                   << " --version'). Output:\n"
-                   << r.output;
+            GTEST_SKIP() << "C++ compiler is not available (cannot run '" << compiler
+                         << " --version'). Output:\n"
+                         << r.output;
         }
     }
 

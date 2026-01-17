@@ -61,6 +61,7 @@ configure_file(CodegenTestConfig.h.in CodegenTestConfig.h @ONLY)
 
 add_executable(calc4-codegen-test
     CodegenExecutionTest.cpp
+    CodegenTestMain.cpp
     ExecutionTestCases.cpp
     CodegenTestCommon.h
     ExecutionTestCases.h
@@ -72,6 +73,7 @@ target_include_directories(calc4-codegen-test PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(calc4-codegen-test gtest_main calc4-core)
+target_link_libraries(calc4-codegen-test gtest calc4-core)
 add_test(NAME calc4-codegen-test COMMAND calc4-codegen-test)
+set_tests_properties(calc4-codegen-test PROPERTIES SKIP_RETURN_CODE 77)
 target_compile_definitions(calc4-codegen-test PRIVATE GTEST_HAS_CXXABI_H_=0)
