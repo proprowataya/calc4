@@ -41,6 +41,7 @@ constexpr std::string_view EnableOptimization = "-O1";
 constexpr std::string_view DisableOptimization = "-O0";
 constexpr std::string_view InfinitePrecisionInteger = "inf";
 constexpr std::string_view EmitCpp = "--emit-cpp";
+constexpr std::string_view EmitWat = "--emit-wat";
 constexpr std::string_view DumpProgram = "--dump";
 }
 
@@ -215,6 +216,10 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
         {
             option.emitCpp = true;
         }
+        else if (str == CommandLineArgs::EmitWat)
+        {
+            option.emitWat = true;
+        }
         else if (str == CommandLineArgs::DumpProgram)
         {
             option.dumpProgram = true;
@@ -230,6 +235,19 @@ std::tuple<Option, std::vector<const char*>, bool> ParseCommandLineArgs(int argc
         ReportWarning('\"' + std::string(CommandLineArgs::EmitCpp) +
                       "\" option was specified, but it will be ignored in the repl mode.");
         option.emitCpp = false;
+    }
+
+    if (sources.empty() && option.emitWat)
+    {
+        ReportWarning('\"' + std::string(CommandLineArgs::EmitWat) +
+                      "\" option was specified, but it will be ignored in the repl mode.");
+        option.emitWat = false;
+    }
+
+    if (option.emitWat && (option.integerSize != 32 && option.integerSize != 64))
+    {
+        ReportError(
+            "WebAssembly Text Format generation is not supported for the specified integer size.");
     }
 
 #if defined(ENABLE_INT128) || defined(ENABLE_GMP)
@@ -461,6 +479,8 @@ void PrintHelp(int argc, char** argv)
          << Indent << "Always use the tree traversal executors (very slow)" << endl
          << CommandLineArgs::EmitCpp << endl
          << Indent << "Emit C++ code for source input (experimental feature)" << endl
+         << CommandLineArgs::EmitWat << endl
+         << Indent << "Emit WebAssembly Text Format for source input (experimental feature)" << endl
          << CommandLineArgs::DumpProgram << endl
          << Indent << "Dump the given program's structures such as an abstract syntax tree" << endl
          << endl

@@ -16,6 +16,7 @@
 #include "Optimizer.h"
 #include "StackMachine.h"
 #include "SyntaxAnalysis.h"
+#include "WasmTextEmitter.h"
 
 #ifdef ENABLE_JIT
 #include "Jit.h"
@@ -23,9 +24,11 @@
 
 #include <chrono>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <type_traits>
 #include <unordered_map>
 
 namespace calc4
@@ -75,6 +78,7 @@ struct Option
     bool checkZeroDivision = true;
     bool dumpProgram = false;
     bool emitCpp = false;
+    bool emitWat = false;
 };
 
 /*****
@@ -313,6 +317,47 @@ TNumber ExecuteOperator(
     }
 }
 
+void FormatError(const Exceptions::Calc4Exception& error, std::string_view source,
+                 const char* filePath, std::ostream& out)
+{
+    using namespace std;
+
+    auto& position = error.GetPosition();
+    if (position)
+    {
+        if (filePath != nullptr)
+        {
+            out << filePath << ":";
+        }
+
+        out << (position->lineNo + 1) << ":" << (position->charNo + 1) << ": ";
+    }
+
+    out << "Error: " << error.what() << endl;
+
+    if (position)
+    {
+        size_t lineStartIndex = source.substr(0, position->index).find_last_of("\r\n");
+        lineStartIndex = lineStartIndex == source.npos ? 0 : (lineStartIndex + 1);
+
+        size_t lineEndIndex = source.find_first_of("\r\n", position->index);
+        lineEndIndex = lineEndIndex == source.npos ? source.length() : lineEndIndex;
+
+        std::string_view line = source.substr(lineStartIndex, lineEndIndex - lineStartIndex);
+
+        static constexpr int LineNoWidth = 8;
+        static constexpr std::string_view Splitter = " | ";
+        out << std::right << std::setw(LineNoWidth) << (position->lineNo + 1) << Splitter << line
+            << endl;
+        for (int i = 0; i < LineNoWidth + static_cast<int>(Splitter.length()) + position->charNo;
+             i++)
+        {
+            out << ' ';
+        }
+        out << '^' << endl;
+    }
+}
+
 template<typename TNumber, typename TVariableSource = DefaultVariableSource<TNumber>,
          typename TGlobalArraySource = DefaultGlobalArraySource<TNumber>,
          typename TInputSource = DefaultInputSource, typename TPrinter = DefaultPrinter>
@@ -341,22 +386,42 @@ void ExecuteSource(
             PrintTree(context, op, out);
         }
 
+        bool emitted = false;
+
         if (option.emitCpp)
         {
             assert(filePath != nullptr);
 
-            std::string outputFilePath = filePath;
-            auto index = outputFilePath.find_last_of('.');
-            if (index != std::string_view::npos)
-            {
-                outputFilePath.erase(index);
-            }
-            outputFilePath += ".cpp";
+            std::filesystem::path outputFilePath = filePath;
+            outputFilePath.replace_extension(".cpp");
 
             std::ofstream ofs(outputFilePath);
             EmitCppCode<TNumber>(op, context, ofs);
+            emitted = true;
         }
-        else
+
+        if (option.emitWat)
+        {
+            if constexpr (std::is_same_v<TNumber, int32_t> || std::is_same_v<TNumber, int64_t>)
+            {
+                assert(filePath != nullptr);
+
+                std::filesystem::path outputFilePath = filePath;
+                outputFilePath.replace_extension(".wat");
+
+                std::ofstream ofs(outputFilePath);
+                EmitWatCode<TNumber>(op, context, ofs);
+                emitted = true;
+            }
+            else
+            {
+                throw Exceptions::AssertionErrorException(
+                    std::nullopt,
+                    "Unsupported integer size in generating WebAssembly Text Format.");
+            }
+        }
+
+        if (!emitted)
         {
             TNumber result = ExecuteOperator(op, context, state, option, out);
             auto end = chrono::high_resolution_clock::now();
@@ -368,40 +433,7 @@ void ExecuteSource(
     }
     catch (Exceptions::Calc4Exception& error)
     {
-        auto& position = error.GetPosition();
-        if (position)
-        {
-            if (filePath != nullptr)
-            {
-                out << filePath << ":";
-            }
-
-            out << (position->lineNo + 1) << ":" << (position->charNo + 1) << ": ";
-        }
-
-        out << "Error: " << error.what() << endl;
-
-        if (position)
-        {
-            size_t lineStartIndex = source.substr(0, position->index).find_last_of("\r\n");
-            lineStartIndex = lineStartIndex == source.npos ? 0 : (lineStartIndex + 1);
-
-            size_t lineEndIndex = source.find_first_of("\r\n", position->index);
-            lineEndIndex = lineEndIndex == source.npos ? source.length() : lineEndIndex;
-
-            std::string_view line = source.substr(lineStartIndex, lineEndIndex - lineStartIndex);
-
-            static constexpr int LineNoWidth = 8;
-            static constexpr std::string_view Splitter = " | ";
-            out << std::right << std::setw(LineNoWidth) << (position->lineNo + 1) << Splitter
-                << line << endl;
-            for (int i = 0;
-                 i < LineNoWidth + static_cast<int>(Splitter.length()) + position->charNo; i++)
-            {
-                out << ' ';
-            }
-            out << '^' << endl;
-        }
+        FormatError(error, source, filePath, out);
     }
     catch (std::exception& e)
     {

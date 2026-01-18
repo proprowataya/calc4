@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -770,4 +771,43 @@ public:
     MAKE_ACCEPT;
     // MAKE_GET_OPERANDS()
 };
+
+inline void GatherVariableNamesCore(const std::shared_ptr<const Operator>& op,
+                                    std::set<std::string_view>& result)
+{
+    if (auto loadVariable = dynamic_cast<const LoadVariableOperator*>(op.get()))
+    {
+        result.emplace(loadVariable->GetVariableName());
+    }
+    else if (auto storeVariable = dynamic_cast<const StoreVariableOperator*>(op.get()))
+    {
+        result.emplace(storeVariable->GetVariableName());
+    }
+    else if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(op.get()))
+    {
+        for (auto& child : parenthesis->GetOperators())
+        {
+            GatherVariableNamesCore(child, result);
+        }
+    }
+
+    for (auto& operand : op->GetOperands())
+    {
+        GatherVariableNamesCore(operand, result);
+    }
+}
+
+inline std::set<std::string_view> GatherVariableNames(const std::shared_ptr<const Operator>& op,
+                                                      const CompilationContext& context)
+{
+    std::set<std::string_view> result;
+
+    GatherVariableNamesCore(op, result);
+    for (auto it = context.UserDefinedOperatorBegin(); it != context.UserDefinedOperatorEnd(); it++)
+    {
+        GatherVariableNamesCore(it->second.GetOperator(), result);
+    }
+
+    return result;
+}
 }

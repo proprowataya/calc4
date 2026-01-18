@@ -16,10 +16,10 @@
 #include <memory>
 #include <sstream>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -88,9 +88,6 @@ void GenerateIR(
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
          typename TInputSource, typename TPrinter>
 class IRGenerator;
-
-std::unordered_set<std::string> GatherVariableNames(const std::shared_ptr<const Operator>& op,
-                                                    const CompilationContext& context);
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,
@@ -195,7 +192,7 @@ TNumber EvaluateByJIT(
         throw error;
     }
 
-    auto func = (TNumber(*)(
+    auto func = (TNumber (*)(
         ExecutionState<TNumber, TVariableSource, TGlobalArraySource, TInputSource, TPrinter>*))
                     EE->getFunctionAddress(MainFunctionName);
 
@@ -296,7 +293,7 @@ protected:
     std::shared_ptr<llvm::IRBuilder<>> builder;
     std::unordered_map<std::string, llvm::Function*> functionMap;
     JITCodeGenerationOption option;
-    const std::unordered_set<std::string>& variableNames;
+    const std::set<std::string_view>& variableNames;
     bool isMainFunction;
 
     InternalFunction throwZeroDivision, getChar, printChar, loadVariable, storeVariable, loadArray,
@@ -307,7 +304,7 @@ public:
                     const std::shared_ptr<llvm::IRBuilder<>>& builder,
                     const std::unordered_map<std::string, llvm::Function*>& functionMap,
                     const JITCodeGenerationOption& option,
-                    const std::unordered_set<std::string>& variableNames, bool isMainFunction)
+                    const std::set<std::string_view>& variableNames, bool isMainFunction)
         : module(module), context(context), function(function), builder(builder),
           functionMap(functionMap), option(option), variableNames(variableNames),
           isMainFunction(isMainFunction)
@@ -369,8 +366,9 @@ public:
 
             for (auto& variableName : this->variableNames)
             {
+                llvm::StringRef variableNameRef(variableName.data(), variableName.size());
                 llvm::GlobalVariable* variableNameStr =
-                    this->builder->CreateGlobalString(variableName);
+                    this->builder->CreateGlobalString(variableNameRef);
                 llvm::GlobalVariable* variable = GetGlobalVariable(variableName);
 
                 // Restore the value from TVariableSource
@@ -390,8 +388,9 @@ public:
         {
             for (auto& variableName : this->variableNames)
             {
+                llvm::StringRef variableNameRef(variableName.data(), variableName.size());
                 llvm::GlobalVariable* variableNameStr =
-                    this->builder->CreateGlobalString(variableName);
+                    this->builder->CreateGlobalString(variableNameRef);
                 llvm::GlobalVariable* variable = GetGlobalVariable(variableName);
 
                 // Load value from the JITed global variable
@@ -744,10 +743,10 @@ private:
         return builder->CreateCall(func.type, functionPtr, arguments);
     }
 
-    llvm::GlobalVariable* GetGlobalVariable(const std::string& variableName)
+    llvm::GlobalVariable* GetGlobalVariable(std::string_view variableName)
     {
         // First, try to find the global variable from our module
-        std::string actualVariableName = GlobalVariableNamePrefix + variableName;
+        std::string actualVariableName = GlobalVariableNamePrefix + std::string(variableName);
         auto variable = this->module->getGlobalVariable(actualVariableName);
         if (variable != nullptr)
         {
@@ -767,54 +766,6 @@ private:
         return this->builder->getIntNTy(IntegerBits<TNumber>);
     }
 };
-
-void GatherVariableNamesCore(const std::shared_ptr<const Operator>& op,
-                             const CompilationContext& context,
-                             std::unordered_set<std::string>& set,
-                             std::unordered_set<std::string>& visitedUserDefinedOperators)
-{
-    if (auto userDefined = dynamic_cast<const UserDefinedOperator*>(op.get()))
-    {
-        auto& name = userDefined->GetDefinition().GetName();
-
-        if (visitedUserDefinedOperators.find(name) != visitedUserDefinedOperators.end())
-        {
-            visitedUserDefinedOperators.insert(name);
-            auto& implement = context.GetOperatorImplement(name);
-            GatherVariableNamesCore(implement.GetOperator(), context, set,
-                                    visitedUserDefinedOperators);
-        }
-    }
-    else if (auto parenthesis = dynamic_cast<const ParenthesisOperator*>(op.get()))
-    {
-        for (auto& op2 : parenthesis->GetOperators())
-        {
-            GatherVariableNamesCore(op2, context, set, visitedUserDefinedOperators);
-        }
-    }
-    else if (auto loadVariable = dynamic_cast<const LoadVariableOperator*>(op.get()))
-    {
-        set.insert(loadVariable->GetVariableName());
-    }
-    else if (auto storeVariable = dynamic_cast<const StoreVariableOperator*>(op.get()))
-    {
-        set.insert(storeVariable->GetVariableName());
-    }
-
-    for (auto& operand : op->GetOperands())
-    {
-        GatherVariableNamesCore(operand, context, set, visitedUserDefinedOperators);
-    }
-}
-
-std::unordered_set<std::string> GatherVariableNames(const std::shared_ptr<const Operator>& op,
-                                                    const CompilationContext& context)
-{
-    std::unordered_set<std::string> variableNames;
-    std::unordered_set<std::string> visitedUserDefinedOperators;
-    GatherVariableNamesCore(op, context, variableNames, visitedUserDefinedOperators);
-    return variableNames;
-}
 }
 
 template<typename TNumber, typename TVariableSource, typename TGlobalArraySource,

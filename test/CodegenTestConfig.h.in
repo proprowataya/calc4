@@ -1,0 +1,27 @@
+/*****
+ *
+ * The Calc4 Programming Language
+ *
+ * Copyright (C) 2018-2026 Yuya Watari
+ * This software is released under the MIT License, see LICENSE file for details
+ *
+ *****/
+
+#pragma once
+
+// The absolute path of the "test" source directory.
+#define CODEGEN_TEST_SOURCE_DIR R"(@CMAKE_CURRENT_SOURCE_DIR@)"
+
+// The compiler used to build calc4 (used to compile generated C++ code in integration tests).
+#define CODEGEN_TEST_CXX_COMPILER R"(@CMAKE_CXX_COMPILER@)"
+#define CODEGEN_TEST_CXX_COMPILER_ID R"(@CMAKE_CXX_COMPILER_ID@)"
+#define CODEGEN_TEST_CXX_COMPILER_VERSION R"(@CMAKE_CXX_COMPILER_VERSION@)"
+
+// Optional dependency: Node.js executable path (empty if not found at configure time).
+#define CODEGEN_TEST_NODE_EXECUTABLE R"(@NODE_EXECUTABLE@)"
+
+// Optional dependency: WABT's wat2wasm executable path (empty if not found at configure time).
+#define CODEGEN_TEST_WAT2WASM_EXECUTABLE R"(@WAT2WASM_EXECUTABLE@)"
+
+// Optional base directory for codegen test temporary files (empty means use system default).
+#define CODEGEN_TEST_TEMP_DIR R"(@CODEGEN_TEST_TEMP_DIR@)"
