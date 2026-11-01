@@ -39,6 +39,7 @@
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO.h"
 
 #include "Exceptions.h"
@@ -131,7 +132,7 @@ TNumber EvaluateByJIT(
     /* ***** Create module ***** */
     std::unique_ptr<Module> Owner = std::make_unique<Module>("calc4-jit-module", Context);
     Module* M = Owner.get();
-    M->setTargetTriple(LLVM_HOST_TRIPLE);
+    M->setTargetTriple(Triple(LLVM_HOST_TRIPLE));
 
     /* ***** Generate LLVM-IR ***** */
     GenerateIR<TNumber>(context, option, state, op, &Context, M);
@@ -219,7 +220,7 @@ void GenerateIR(
     /* ***** Initialize variables ***** */
     llvm::Type* integerType = llvm::Type::getIntNTy(*llvmContext, IntegerBits<TNumber>);
     llvm::Type* usedDefinedReturnType = integerType;
-    llvm::Type* executionStateType = llvm::PointerType::get(llvm::Type::getVoidTy(*llvmContext), 0);
+    llvm::Type* executionStateType = llvm::PointerType::get(*llvmContext, 0);
 
     /* ***** Make function map (operator's name -> LLVM function) and the functions ***** */
     std::unordered_map<std::string, llvm::Function*> functionMap;
@@ -322,9 +323,9 @@ public:
     { GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, __VA_ARGS__), GET_LLVM_FUNCTION_ADDRESS(NAME) }
 
         llvm::Type* voidType = llvm::Type::getVoidTy(*this->context);
-        llvm::Type* voidPointerType = llvm::PointerType::get(voidType, 0);
+        llvm::Type* voidPointerType = llvm::PointerType::get(*this->context, 0);
         llvm::Type* integerType = builder->getIntNTy(IntegerBits<TNumber>);
-        llvm::Type* stringType = llvm::PointerType::get(builder->getInt8Ty(), 0);
+        llvm::Type* stringType = llvm::PointerType::get(*this->context, 0);
 
         throwZeroDivision = GET_INTERNAL_FUNCTION(
             ThrowZeroDivisionException, llvm::Type::getVoidTy(*this->context), { voidPointerType });
@@ -739,7 +740,7 @@ private:
                                          llvm::IRBuilder<>* builder)
     {
         auto functionPtr = builder->CreateCast(llvm::Instruction::CastOps::IntToPtr, func.address,
-                                               llvm::PointerType::get(func.type, 0));
+                                               llvm::PointerType::get(builder->getContext(), 0));
         return builder->CreateCall(func.type, functionPtr, arguments);
     }
 
