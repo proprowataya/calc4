@@ -70,7 +70,7 @@ if (ENABLE_JIT)
     if (MSVC)
         target_compile_options(calc4-core PUBLIC "/sdl-" "/MP")
     else()
-        target_compile_options(calc4-core PUBLIC "-fexceptions" "-Wno-unknown-warning-option" "-Wno-unused-command-line-argument")
+        target_compile_options(calc4-core PUBLIC "-fexceptions")
     endif()
 endif()
 

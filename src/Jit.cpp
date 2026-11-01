@@ -311,7 +311,7 @@ public:
           isMainFunction(isMainFunction)
     {
 #define GET_LLVM_FUNCTION_TYPE(RETURN_TYPE, ...)                                                   \
-    llvm::FunctionType::get(RETURN_TYPE, { __VA_ARGS__ }, false)
+    llvm::FunctionType::get(RETURN_TYPE, __VA_ARGS__, false)
 
 #define GET_LLVM_FUNCTION_ADDRESS(NAME)                                                            \
     this->builder->getIntN(                                                                        \
