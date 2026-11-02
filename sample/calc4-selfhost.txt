@@ -1,0 +1,526 @@
+/*
+ * Self-hosted Calc4
+ *
+ * This program reads a calc4 program from standard input and evaluates it by using calc4 itself.
+ * The outer calc4 receives this file as the program.
+ * The target calc4 program is passed through standard input.
+ *
+ * Usage:
+ *   $ cat calc4-program.txt | calc4 ./calc4-selfhost.txt
+ *
+ * To pass input to the target program, put a zero byte after the target source.
+ * Bytes after the zero byte are read by the target input operator I.
+ *
+ * Example:
+ *   $ echo 'D[fib|n|n <= 1 ? n ? (n - 1){fib} + (n - 2){fib}] 10{fib}' | calc4 ./calc4-selfhost.txt
+ *   55
+ *
+ * Example with input:
+ *   $ { printf 'I + I'; printf '\0'; printf 'AB'; } | calc4 ./calc4-selfhost.txt
+ *   131
+ *   131 is the sum of A (65) and B (66) in ASCII.
+ *
+ *   $ { cat ./calc4-selfhost.txt ; printf '\0'; printf 'D[fib|n|n <= 1 ? n ? (n - 1){fib} + (n - 2){fib}] 10{fib}'; } | calc4 ./calc4-selfhost.txt
+ *   55
+ *   This is a nested self-hosting example.
+ *   The inner interpreter reads the Fibonacci program after the zero byte.
+ */
+
+D[SourceOrigin||100000]
+D[NameOrigin||200000]
+D[NameSize||2]
+D[DefOrigin||230000]
+D[DefSize||8]
+D[TokenOrigin||300000]
+D[TokenSize||5]
+D[NodeOrigin||420000]
+D[NodeSize||6]
+D[ArrayOrigin||100000000]
+D[FrameOrigin||2000000]
+D[FrameSize||3]
+D[VarOrigin||780000]
+D[VarSize||2]
+D[TargetMemoryOrigin||200000000]
+
+D[TokenDefine||1]
+D[TokenArg||2]
+D[TokenLoadVar||3]
+D[TokenInput||4]
+D[TokenParen||5]
+D[TokenDecimal||6]
+D[TokenStoreVar||7]
+D[TokenLoadArray||8]
+D[TokenPrint||9]
+D[TokenBinary||10]
+D[TokenStoreArray||11]
+D[TokenConditional||12]
+D[TokenUser||13]
+
+D[NodeZero||1]
+D[NodeDefine||2]
+D[NodeArg||3]
+D[NodeLoadVar||4]
+D[NodeInput||5]
+D[NodeLoadArray||6]
+D[NodePrint||7]
+D[NodeParen||8]
+D[NodeDecimal||9]
+D[NodeStoreVar||10]
+D[NodeStoreArray||11]
+D[NodeBinary||12]
+D[NodeConditional||13]
+D[NodeUser||14]
+
+D[BinAdd||1]
+D[BinSub||2]
+D[BinMult||3]
+D[BinDiv||4]
+D[BinMod||5]
+D[BinEq||6]
+D[BinNe||7]
+D[BinLt||8]
+D[BinLe||9]
+D[BinGe||10]
+D[BinGt||11]
+D[BinAnd||12]
+D[BinOr||13]
+
+D[Field0||0]
+D[Field1||1]
+D[Field2||2]
+D[Field3||3]
+D[Field4||4]
+D[Field5||5]
+D[Missing||(0-1)]
+
+D[Fail||0/0]
+
+D[SourceChar|i|({SourceOrigin}+i)@]
+D[PutSourceChar|i,c|c->({SourceOrigin}+i)]
+D[ReadSourceChar|c|((c == (0-1)) || (c == 0)) ? 0 ? (((L[sourceLen]){PutSourceChar}c)((L[sourceLen]+1)S[sourceLen])(I{ReadSourceChar}))]
+D[ReadSource||I{ReadSourceChar}]
+
+D[NameAddr|n|{NameOrigin}+n*{NameSize}]
+D[NameStart|n|(n{NameAddr})@]
+D[NameLen|n|((n{NameAddr})+1)@]
+D[SetNameStart|n,v|v->(n{NameAddr})]
+D[SetNameLen|n,v|v->((n{NameAddr})+1)]
+
+D[RangeEqNameLoop|s,l,n,i|i >= l ? 1 ? (((s+i){SourceChar} == ((n{NameStart})+i){SourceChar}) ? (s{RangeEqNameLoop}l{RangeEqNameLoop}n{RangeEqNameLoop}(i+1)) ? 0)]
+D[RangeEqName|s,l,n|l == n{NameLen} ? (s{RangeEqNameLoop}l{RangeEqNameLoop}n{RangeEqNameLoop}0) ? 0]
+D[RangeEqNameCharDiff|s,n,i|((s+i){SourceChar}) - (((n{NameStart})+i){SourceChar})]
+D[RangeEqNameLoop|s,n,i,l|i >= l ? 1 ? ((s{RangeEqNameCharDiff}n{RangeEqNameCharDiff}i) == 0 ? (s{RangeEqNameLoop}n{RangeEqNameLoop}(i+1){RangeEqNameLoop}l) ? 0)]
+D[RangeEqName|s,l,n|l != n{NameLen} ? 0 ? (s{RangeEqNameLoop}n{RangeEqNameLoop}0{RangeEqNameLoop}l)]
+D[FindNameRange|s,l,i|i > L[nameCount] ? 0 ? ((s{RangeEqName}l{RangeEqName}i) ? i ? (s{FindNameRange}l{FindNameRange}(i+1)))]
+D[NewNameRangeWithLen|s,l|((L[nameCount]+1)S[nameCount])(L[nameCount]{SetNameStart}s)(L[nameCount]{SetNameLen}l)L[nameCount]]
+D[NewNameRange|s,e|s{NewNameRangeWithLen}(e-s)]
+
+D[ArrayCell|p|{ArrayOrigin}+p]
+D[ArrayGet|p|(p{ArrayCell})@]
+D[ArraySet|p,v|v->(p{ArrayCell})]
+D[AllocCells|c|(L[arrayNext]S[allocStart])((L[arrayNext]+c)S[arrayNext])L[allocStart]]
+
+D[DefAddr|d|{DefOrigin}+d*{DefSize}]
+D[DefField|d,o|((d{DefAddr})+o)@]
+D[SetDefField|d,o,v|v->((d{DefAddr})+o)]
+D[DefName|d|d{DefField}{Field0}]
+D[DefArity|d|d{DefField}{Field1}]
+D[DefArgs|d|d{DefField}{Field2}]
+D[DefBodyStart|d|d{DefField}{Field3}]
+D[DefBodyEnd|d|d{DefField}{Field4}]
+D[DefTokenStart|d|d{DefField}{Field5}]
+D[DefTokenEnd|d|d{DefField}6]
+D[DefBodyNode|d|d{DefField}7]
+D[SetDefName|d,v|d{SetDefField}{Field0}{SetDefField}v]
+D[SetDefArity|d,v|d{SetDefField}{Field1}{SetDefField}v]
+D[SetDefArgs|d,v|d{SetDefField}{Field2}{SetDefField}v]
+D[SetDefBodyStart|d,v|d{SetDefField}{Field3}{SetDefField}v]
+D[SetDefBodyEnd|d,v|d{SetDefField}{Field4}{SetDefField}v]
+D[SetDefTokenStart|d,v|d{SetDefField}{Field5}{SetDefField}v]
+D[SetDefTokenEnd|d,v|d{SetDefField}6{SetDefField}v]
+D[SetDefBodyNode|d,v|d{SetDefField}7{SetDefField}v]
+D[NewDef|n,s,e|
+  ((L[defCount]+1)S[defCount])
+  (L[defCount]{SetDefName}n)
+  (L[defCount]{SetDefArity}0)
+  (L[defCount]{SetDefArgs}L[arrayNext])
+  (L[defCount]{SetDefBodyStart}s)
+  (L[defCount]{SetDefBodyEnd}e)
+  (L[defCount]{SetDefTokenStart}{Missing})
+  (L[defCount]{SetDefTokenEnd}{Missing})
+  (L[defCount]{SetDefBodyNode}0)
+  L[defCount]]
+
+D[TokenAddr|t|{TokenOrigin}+t*{TokenSize}]
+D[TokenField|t,o|((t{TokenAddr})+o)@]
+D[SetTokenField|t,o,v|v->((t{TokenAddr})+o)]
+D[TokenType|t|t{TokenField}{Field0}]
+D[TokenVal|t|t{TokenField}{Field1}]
+D[TokenA|t|t{TokenField}{Field2}]
+D[TokenB|t|t{TokenField}{Field3}]
+D[TokenC|t|t{TokenField}{Field4}]
+D[SetTokenVal|t,v|t{SetTokenField}{Field1}{SetTokenField}v]
+D[SetTokenA|t,v|t{SetTokenField}{Field2}{SetTokenField}v]
+D[SetTokenB|t,v|t{SetTokenField}{Field3}{SetTokenField}v]
+D[SetTokenC|t,v|t{SetTokenField}{Field4}{SetTokenField}v]
+D[NewToken|t,v,a,b,c|
+  (L[tokenCount]S[newToken])
+  ((L[tokenCount]+1)S[tokenCount])
+  (L[newToken]{SetTokenField}{Field0}{SetTokenField}t)
+  (L[newToken]{SetTokenVal}v)
+  (L[newToken]{SetTokenA}a)
+  (L[newToken]{SetTokenB}b)
+  (L[newToken]{SetTokenC}c)
+  L[newToken]]
+
+D[NodeAddr|n|{NodeOrigin}+n*{NodeSize}]
+D[NodeField|n,o|((n{NodeAddr})+o)@]
+D[SetNodeField|n,o,v|v->((n{NodeAddr})+o)]
+D[NodeType|n|n{NodeField}{Field0}]
+D[NodeVal|n|n{NodeField}{Field1}]
+D[NodeA|n|n{NodeField}{Field2}]
+D[NodeB|n|n{NodeField}{Field3}]
+D[NodeC|n|n{NodeField}{Field4}]
+D[NodeD|n|n{NodeField}{Field5}]
+D[SetNodeVal|n,v|n{SetNodeField}{Field1}{SetNodeField}v]
+D[SetNodeA|n,v|n{SetNodeField}{Field2}{SetNodeField}v]
+D[SetNodeB|n,v|n{SetNodeField}{Field3}{SetNodeField}v]
+D[SetNodeC|n,v|n{SetNodeField}{Field4}{SetNodeField}v]
+D[SetNodeD|n,v|n{SetNodeField}{Field5}{SetNodeField}v]
+D[NewNode|t,v,a,b,c,d|
+  ((L[nodeCount]+1)S[nodeCount])
+  (L[nodeCount]{SetNodeField}{Field0}{SetNodeField}t)
+  (L[nodeCount]{SetNodeVal}v)
+  (L[nodeCount]{SetNodeA}a)
+  (L[nodeCount]{SetNodeB}b)
+  (L[nodeCount]{SetNodeC}c)
+  (L[nodeCount]{SetNodeD}d)
+  L[nodeCount]]
+D[NewNodeZero||{NodeZero}{NewNode}0{NewNode}0{NewNode}0{NewNode}0{NewNode}0]
+D[NewNodeSimple|t,v|t{NewNode}v{NewNode}0{NewNode}0{NewNode}0{NewNode}0]
+
+D[FrameAddr|f|{FrameOrigin}+f*{FrameSize}]
+D[FrameField|f,o|((f{FrameAddr})+o)@]
+D[SetFrameField|f,o,v|v->((f{FrameAddr})+o)]
+D[FrameArgs|f|f{FrameField}{Field1}]
+D[NewFrame|d,a,c|
+  ((L[frameCount]+1)S[frameCount])
+  (L[frameCount]{SetFrameField}{Field0}{SetFrameField}d)
+  (L[frameCount]{SetFrameField}{Field1}{SetFrameField}a)
+  (L[frameCount]{SetFrameField}{Field2}{SetFrameField}c)
+  L[frameCount]]
+
+D[VarAddr|v|{VarOrigin}+v*{VarSize}]
+D[VarName|v|(v{VarAddr})@]
+D[VarValue|v|((v{VarAddr})+1)@]
+D[SetVarName|v,n|n->(v{VarAddr})]
+D[SetVarValue|v,x|x->((v{VarAddr})+1)]
+D[NameEq|a,b|(a{NameStart}){RangeEqName}(a{NameLen}){RangeEqName}b]
+D[FindVar|n,i|i > L[varCount] ? 0 ? ((n{NameEq}(i{VarName})) ? i ? (n{FindVar}(i+1)))]
+D[GetVar|n|((n{FindVar}1)S[varIndex]) L[varIndex] ? L[varIndex]{VarValue} ? 0]
+D[SetVar|n,x|((n{FindVar}1)S[varIndex]) L[varIndex] ? (L[varIndex]{SetVarValue}x) ? (((L[varCount]+1)S[varCount])(L[varCount]{SetVarName}n)(L[varCount]{SetVarValue}x)x)]
+
+D[MatchRangeNameAt|s,n,i,l|i >= l ? 1 ? ((((s+i){SourceChar}) == (((n{NameStart})+i){SourceChar})) ? (s{MatchRangeNameAt}n{MatchRangeNameAt}(i+1){MatchRangeNameAt}l) ? 0)]
+D[MatchRangeName|s,l,n|l == n{NameLen} ? (s{MatchRangeNameAt}n{MatchRangeNameAt}0{MatchRangeNameAt}l) ? 0]
+D[NameEq|a,b|(a{NameStart}){MatchRangeName}(a{NameLen}){MatchRangeName}b]
+D[FindVar|n,i|i > L[varCount] ? 0 ? ((n{NameEq}(i{VarName})) ? i ? (n{FindVar}(i+1)))]
+D[RangeHashLoop|s,l,i,h|i >= l ? h ? (s{RangeHashLoop}l{RangeHashLoop}(i+1){RangeHashLoop}(h*257+((s+i){SourceChar})))]
+D[RangeHash|s,l|s{RangeHashLoop}l{RangeHashLoop}0{RangeHashLoop}0]
+D[NameHash|n|(n{NameStart}){RangeHash}(n{NameLen})]
+D[MatchRangeName|s,l,n|l == n{NameLen} ? ((s{RangeHash}l) == (n{NameHash}) ? 1 ? 0) ? 0]
+D[NameEq|a,b|(a{NameStart}){MatchRangeName}(a{NameLen}){MatchRangeName}b]
+D[FindVar|n,i|i > L[varCount] ? 0 ? ((n{NameEq}(i{VarName})) ? i ? (n{FindVar}(i+1)))]
+
+D[IsSpace|c|((c == 32) || (c == 10)) || (c == 13)]
+D[HasTwo|p,e,a,b|((p+1) < e) && (((p{SourceChar}) == a) && (((p+1){SourceChar}) == b))]
+D[SkipLine|p,e|p >= e ? e ? (((p{SourceChar} == 10) || (p{SourceChar} == 13)) ? (p+1) ? ((p+1){SkipLine}e))]
+D[SkipBlock|p,e|p >= e ? e ? ((p{HasTwo}e{HasTwo}42{HasTwo}47) ? (p+2) ? ((p+1){SkipBlock}e))]
+D[ReadBracketEnd|p,e,d|p >= e ? {Fail} ? ((p{SourceChar} == 93) ? (d == 1 ? p ? ((p+1){ReadBracketEnd}e{ReadBracketEnd}(d-1))) ? ((p{SourceChar} == 91) ? ((p+1){ReadBracketEnd}e{ReadBracketEnd}(d+1)) ? ((p+1){ReadBracketEnd}e{ReadBracketEnd}d)))]
+D[SkipOptionalSupplement|p,e|(p < e) && (p{SourceChar} == 91) ? (((p+1){ReadBracketEnd}e{ReadBracketEnd}1)+1) ? p]
+D[FindChar|p,e,c|p >= e ? e ? ((p{SourceChar} == c) ? p ? ((p+1){FindChar}e{FindChar}c))]
+D[FindParen|p,e,d|p >= e ? {Fail} ? ((p{SourceChar} == 40) ? ((p+1){FindParen}e{FindParen}(d+1)) ? ((p{SourceChar} == 41) ? (d == 1 ? p ? ((p+1){FindParen}e{FindParen}(d-1))) ? ((p+1){FindParen}e{FindParen}d)))]
+D[FindParenChar|c,p,e,d|c == 40 ? ((p+1){FindParen}e{FindParen}(d+1)) ? (c == 41 ? (d == 1 ? p ? ((p+1){FindParen}e{FindParen}(d-1))) ? ((p+1){FindParen}e{FindParen}d))]
+D[FindParen|p,e,d|p >= e ? {Fail} ? ((p{SourceChar}){FindParenChar}p{FindParenChar}e{FindParenChar}d)]
+D[FindBrace|p,e|p >= e ? {Fail} ? ((p{SourceChar} == 125) ? p ? ((p+1){FindBrace}e))]
+
+D[TrimLeftSpace|p,e|(p < e) && (p{SourceChar} == 32) ? ((p+1){TrimLeftSpace}e) ? p]
+D[TrimRightSpace|s,e|(e > s) && (((e-1){SourceChar}) == 32) ? (s{TrimRightSpace}(e-1)) ? e]
+D[AppendDefArg|d,n|
+  (L[arrayNext]{ArraySet}n)
+  ((L[arrayNext]+1)S[arrayNext])
+  (d{SetDefArity}((d{DefArity})+1))]
+D[ParseArgSegmentDone|r,d,l|l < r ? (d{AppendDefArg}(l{NewNameRange}r)) ? 0]
+D[ParseArgSegmentRight|l,d,e|(l{TrimRightSpace}e){ParseArgSegmentDone}d{ParseArgSegmentDone}l]
+D[ParseArgSegment|d,s,e|(s{TrimLeftSpace}e){ParseArgSegmentRight}d{ParseArgSegmentRight}e]
+D[ParseArgsLoop|d,p,e|p >= e ? 0 ? ((p{FindChar}e{FindChar}44)S[argComma]) (d{ParseArgSegment}p{ParseArgSegment}L[argComma]) (L[argComma] < e ? (d{ParseArgsLoop}(L[argComma]+1){ParseArgsLoop}e) ? 0)]
+D[ParseArgs|d,s,e|s >= e ? 0 ? (d{ParseArgsLoop}s{ParseArgsLoop}e)]
+
+D[FindDefRange|s,l,i|i > L[defCount] ? 0 ? ((s{RangeEqName}l{RangeEqName}(i{DefName})) ? i ? (s{FindDefRange}l{FindDefRange}(i+1)))]
+D[FindArgRange|s,l,d,i|d == 0 ? (0-1) ? (i >= d{DefArity} ? (0-1) ? ((s{RangeEqName}l{RangeEqName}((d{DefArgs}+i){ArrayGet})) ? i ? (s{FindArgRange}l{FindArgRange}d{FindArgRange}(i+1))))]
+D[FindDefRange|s,l,i|i > L[defCount] ? 0 ? ((s{MatchRangeName}l{MatchRangeName}(i{DefName})) ? i ? (s{FindDefRange}l{FindDefRange}(i+1)))]
+D[FindArgRange|s,l,d,i|d == 0 ? (0-1) ? (i >= d{DefArity} ? (0-1) ? ((s{MatchRangeName}l{MatchRangeName}((d{DefArgs}+i){ArrayGet})) ? i ? (s{FindArgRange}l{FindArgRange}d{FindArgRange}(i+1))))]
+D[FindDefRangeReverse|s,l,i|i < 1 ? 0 ? ((s{MatchRangeName}l{MatchRangeName}(i{DefName})) ? i ? (s{FindDefRangeReverse}l{FindDefRangeReverse}(i-1)))]
+D[FindDefRange|s,l,i|s{FindDefRangeReverse}l{FindDefRangeReverse}L[defCount]]
+D[AddResolvedTokenAfterArg|a,x|a != (0-1) ? ({TokenArg}{NewToken}a{NewToken}0{NewToken}0{NewToken}0) ? {Fail}]
+D[AddResolvedTokenAfterDef|x,s,l,d|x ? ({TokenUser}{NewToken}x{NewToken}0{NewToken}0{NewToken}0) ? ((s{FindArgRange}l{FindArgRange}d{FindArgRange}0){AddResolvedTokenAfterArg}x)]
+D[AddResolvedNameToken|s,l,d|(s{FindDefRange}l{FindDefRange}1){AddResolvedTokenAfterDef}s{AddResolvedTokenAfterDef}l{AddResolvedTokenAfterDef}d]
+
+D[ReadSupplementName|p,e|
+  ((p < e) && (p{SourceChar} == 91)) ?
+  ((((p+1){ReadBracketEnd}e{ReadBracketEnd}1)S[suppEnd])(((p+1){NewNameRange}L[suppEnd])S[lastName])(L[suppEnd]+1)) ?
+  (((0{NewNameRange}0)S[lastName])p)]
+D[LexNamedToken|t,p,e|(((p+1){ReadSupplementName}e)S[nextPos])(t{NewToken}L[lastName]{NewToken}0{NewToken}0{NewToken}0)L[nextPos]]
+D[LexSimpleToken|t,p,e|(t{NewToken}0{NewToken}0{NewToken}0{NewToken}0)((p+1){SkipOptionalSupplement}e)]
+D[LexDecimal|p,e|({TokenDecimal}{NewToken}((p{SourceChar})-48){NewToken}0{NewToken}0{NewToken}0)((p+1){SkipOptionalSupplement}e)]
+D[LexBinaryToken|b,p,e|({TokenBinary}{NewToken}b{NewToken}0{NewToken}0{NewToken}0)((p+1){SkipOptionalSupplement}e)]
+D[LexTwoCharBinaryToken|b,p,e|({TokenBinary}{NewToken}b{NewToken}0{NewToken}0{NewToken}0)((p+2){SkipOptionalSupplement}e)]
+D[LexStoreArray|p,e|({TokenStoreArray}{NewToken}0{NewToken}0{NewToken}0{NewToken}0)((p+2){SkipOptionalSupplement}e)]
+D[LexBracedName|p,e,d|
+  (((p+1){FindBrace}e)S[braceEnd])
+  ((p+1){AddResolvedNameToken}(L[braceEnd]-(p+1)){AddResolvedNameToken}d)
+  ((L[braceEnd]+1){SkipOptionalSupplement}e)]
+D[LexOneCharName|p,e,d|
+  (p{AddResolvedNameToken}1{AddResolvedNameToken}d)
+  ((p+1){SkipOptionalSupplement}e)]
+
+D[LexDefine|p,e,d|
+  (((p+2){ReadBracketEnd}e{ReadBracketEnd}1)S[defSuppEnd])
+  ((p+2){FindChar}L[defSuppEnd]{FindChar}124)S[defNameEnd]
+  (((L[defNameEnd]+1){FindChar}L[defSuppEnd]{FindChar}124)S[defArgsEnd])
+  (((p+2){NewNameRange}L[defNameEnd])S[defName])
+  ((L[defName]{NewDef}(L[defArgsEnd]+1){NewDef}L[defSuppEnd])S[createdDef])
+  (L[createdDef]{ParseArgs}(L[defNameEnd]+1){ParseArgs}L[defArgsEnd])
+  ({TokenDefine}{NewToken}L[createdDef]{NewToken}0{NewToken}0{NewToken}0)
+  (L[defSuppEnd]+1)]
+
+D[LexParen|p,e,d|
+  (((p+1){FindParen}e{FindParen}1)S[parenEnd])
+  ({TokenParen}{NewToken}(p+1){NewToken}L[parenEnd]{NewToken}d{NewToken}{Missing})
+  ((L[parenEnd]+1){SkipOptionalSupplement}e)]
+
+D[LexSymbol|p,e,d|
+  (p{HasTwo}e{HasTwo}61{HasTwo}61) ? ({BinEq}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}33{HasTwo}61) ? ({BinNe}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}62{HasTwo}61) ? ({BinGe}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}60{HasTwo}61) ? ({BinLe}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}38{HasTwo}38) ? ({BinAnd}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}124{HasTwo}124) ? ({BinOr}{LexTwoCharBinaryToken}p{LexTwoCharBinaryToken}e) ?
+  ((p{HasTwo}e{HasTwo}45{HasTwo}62) ? (p{LexStoreArray}e) ?
+  ((p{SourceChar} == 43) ? ({BinAdd}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 45) ? ({BinSub}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 42) ? ({BinMult}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 47) ? ({BinDiv}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 37) ? ({BinMod}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 60) ? ({BinLt}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 62) ? ({BinGt}{LexBinaryToken}p{LexBinaryToken}e) ?
+  ((p{SourceChar} == 63) ? ({TokenConditional}{NewToken}0{NewToken}0{NewToken}0{NewToken}0)((p+1){SkipOptionalSupplement}e) ?
+  (p{LexOneCharName}e{LexOneCharName}d)))))))))))))))]
+
+D[LexStep|p,e,d|
+  ((p{SourceChar}){IsSpace}) ? (p+1) ?
+  ((p{HasTwo}e{HasTwo}47{HasTwo}47) ? ((p+2){SkipLine}e) ?
+  ((p{HasTwo}e{HasTwo}47{HasTwo}42) ? ((p+2){SkipBlock}e) ?
+  ((p{SourceChar} == 68) ? (p{LexDefine}e{LexDefine}d) ?
+  ((p{SourceChar} == 76) ? ({TokenLoadVar}{LexNamedToken}p{LexNamedToken}e) ?
+  ((p{SourceChar} == 83) ? ({TokenStoreVar}{LexNamedToken}p{LexNamedToken}e) ?
+  ((p{SourceChar} == 80) ? ({TokenPrint}{LexSimpleToken}p{LexSimpleToken}e) ?
+  ((p{SourceChar} == 73) ? ({TokenInput}{LexSimpleToken}p{LexSimpleToken}e) ?
+  ((p{SourceChar} == 64) ? ({TokenLoadArray}{LexSimpleToken}p{LexSimpleToken}e) ?
+  (((p{SourceChar} >= 48) && (p{SourceChar} <= 57)) ? (p{LexDecimal}e) ?
+  ((p{SourceChar} == 123) ? (p{LexBracedName}e{LexBracedName}d) ?
+  ((p{SourceChar} == 40) ? (p{LexParen}e{LexParen}d) ?
+  (p{LexSymbol}e{LexSymbol}d))))))))))))]
+
+D[LexRange|p,e,d|p >= e ? p ? ((p{SourceChar} == 41) ? p ? (((p{LexStep}e{LexStep}d){LexRange}e{LexRange}d)))]
+
+D[ParseCore|s,e|0]
+D[ParseAllDefs|i|0]
+D[ParseOne|i,e|0]
+D[ParseOneWithMax|i,e,m|0]
+D[ParseOneAfterLower|l,i,e,m|0]
+D[ParseOneLoop|o,i,e,m|0]
+D[ParseOperands|t,i,e,m,p,c|0]
+D[ParseOperandsAfterLower|l,t,i,e,m,p,c|0]
+D[ParseOperandStore|n,l,t,e,m,p,c|0]
+
+D[Max2|a,b|a > b ? a ? b]
+D[TokenNumOperands|t|
+  (t{TokenType} == {TokenDefine}) ? 0 ?
+  ((t{TokenType} == {TokenArg}) ? 0 ?
+  ((t{TokenType} == {TokenLoadVar}) ? 0 ?
+  ((t{TokenType} == {TokenInput}) ? 0 ?
+  ((t{TokenType} == {TokenParen}) ? 0 ?
+  ((t{TokenType} == {TokenDecimal}) ? 1 ?
+  ((t{TokenType} == {TokenStoreVar}) ? 1 ?
+  ((t{TokenType} == {TokenLoadArray}) ? 1 ?
+  ((t{TokenType} == {TokenPrint}) ? 1 ?
+  ((t{TokenType} == {TokenBinary}) ? 2 ?
+  ((t{TokenType} == {TokenStoreArray}) ? 2 ?
+  ((t{TokenType} == {TokenConditional}) ? 3 ?
+  ((t{TokenType} == {TokenUser}) ? ((t{TokenVal}){DefArity}) ?
+  {Fail})))))))))))))]
+D[MaxOperands|i,e|i >= e ? 0 ? ((i{TokenNumOperands}){Max2}((i+1){MaxOperands}e))]
+D[ReadLowerEnd|i,e,m|(i < e) && ((i{TokenNumOperands}) < m) ? ((i+1){ReadLowerEnd}e{ReadLowerEnd}m) ? i]
+
+D[NewParenNode|p,c|{NodeParen}{NewNode}p{NewNode}c{NewNode}0{NewNode}0{NewNode}0]
+D[NewUserNode|d,p,c|{NodeUser}{NewNode}d{NewNode}p{NewNode}c{NewNode}0{NewNode}0]
+D[CreateParenParsed|t|(t{TokenVal}){ParseCore}(t{TokenA})]
+D[CreateParenFresh|t|
+  (L[tokenCount]S[childTokenStart])
+  ((t{TokenVal}){LexRange}(t{TokenA}){LexRange}(t{TokenB}))
+  (L[tokenCount]S[childTokenEnd])
+  (t{SetTokenVal}L[childTokenStart])
+  (t{SetTokenA}L[childTokenEnd])
+  (t{SetTokenC}1)
+  (1{ParseAllDefs})
+  (t{CreateParenParsed})]
+D[CreateParenFromToken|t|t{TokenC} == {Missing} ? (t{CreateParenFresh}) ? (t{CreateParenParsed})]
+D[CreateOp|t,p,c|
+  (t{TokenType} == {TokenDefine}) ? ({NodeDefine}{NewNodeSimple}0) ?
+  ((t{TokenType} == {TokenArg}) ? ({NodeArg}{NewNodeSimple}(t{TokenVal})) ?
+  ((t{TokenType} == {TokenLoadVar}) ? ({NodeLoadVar}{NewNodeSimple}(t{TokenVal})) ?
+  ((t{TokenType} == {TokenInput}) ? ({NodeInput}{NewNodeSimple}0) ?
+  ((t{TokenType} == {TokenParen}) ? (t{CreateParenFromToken}) ?
+  ((t{TokenType} == {TokenDecimal}) ? ({NodeDecimal}{NewNode}(p{ArrayGet}){NewNode}(t{TokenVal}){NewNode}0{NewNode}0{NewNode}0) ?
+  ((t{TokenType} == {TokenStoreVar}) ? ({NodeStoreVar}{NewNode}(p{ArrayGet}){NewNode}(t{TokenVal}){NewNode}0{NewNode}0{NewNode}0) ?
+  ((t{TokenType} == {TokenLoadArray}) ? ({NodeLoadArray}{NewNodeSimple}(p{ArrayGet})) ?
+  ((t{TokenType} == {TokenPrint}) ? ({NodePrint}{NewNodeSimple}(p{ArrayGet})) ?
+  ((t{TokenType} == {TokenBinary}) ? ({NodeBinary}{NewNode}(p{ArrayGet}){NewNode}((p+1){ArrayGet}){NewNode}(t{TokenVal}){NewNode}0{NewNode}0) ?
+  ((t{TokenType} == {TokenStoreArray}) ? ({NodeStoreArray}{NewNode}(p{ArrayGet}){NewNode}((p+1){ArrayGet}){NewNode}0{NewNode}0{NewNode}0) ?
+  ((t{TokenType} == {TokenConditional}) ? ({NodeConditional}{NewNode}(p{ArrayGet}){NewNode}((p+1){ArrayGet}){NewNode}((p+2){ArrayGet}){NewNode}0{NewNode}0) ?
+  ((t{TokenType} == {TokenUser}) ? ((t{TokenVal}){NewUserNode}p{NewUserNode}c) ?
+  {Fail})))))))))))))]
+
+D[FinishParse|p,c|c == 0 ? {Fail} ? (c == 1 ? (p{ArrayGet}) ? (p{NewParenNode}c))]
+D[ParseCoreLoop|i,e,p,c|i >= e ? (p{FinishParse}c) ? (((i{ParseOne}e)S[parsedNode])((p+c){ArraySet}L[parsedNode])(L[parseNext]{ParseCoreLoop}e{ParseCoreLoop}p{ParseCoreLoop}(c+1)))]
+D[ParseCoreWithList|s,e,p|s{ParseCoreLoop}e{ParseCoreLoop}p{ParseCoreLoop}0]
+D[ParseCore|s,e|s >= e ? {Fail} ? (s{ParseCoreWithList}e{ParseCoreWithList}((e-s){AllocCells}))]
+
+D[ParseOne|i,e|i{ParseOneWithMax}e{ParseOneWithMax}(i{MaxOperands}e)]
+D[ParseOneWithMax|i,e,m|m == 0 ? (((i{CreateOp}0{CreateOp}0)S[oneNode])((i+1)S[parseNext])L[oneNode]) ? (((i{ReadLowerEnd}e{ReadLowerEnd}m){ParseOneAfterLower}i{ParseOneAfterLower}e{ParseOneAfterLower}m))]
+D[ParseOneAfterLower|l,i,e,m|l == i ? ((i{TokenType} == {TokenDecimal}) ? (L[zeroNode]{ParseOneLoop}l{ParseOneLoop}e{ParseOneLoop}m) ? {Fail}) ? ((i{ParseCore}l){ParseOneLoop}l{ParseOneLoop}e{ParseOneLoop}m)]
+D[ParseOneLoop|o,i,e,m|((i >= e) || ((i{TokenNumOperands}) < m)) ? ((iS[parseNext])o) ? (((m{AllocCells})S[operandList])(L[operandList]{ArraySet}o)(i{ParseOperands}(i+1){ParseOperands}e{ParseOperands}m{ParseOperands}L[operandList]{ParseOperands}1))]
+D[ParseOperands|t,i,e,m,p,c|c >= m ? ((t{CreateOp}p{CreateOp}m){ParseOneLoop}i{ParseOneLoop}e{ParseOneLoop}m) ? (((i{ReadLowerEnd}e{ReadLowerEnd}m){ParseOperandsAfterLower}t{ParseOperandsAfterLower}i{ParseOperandsAfterLower}e{ParseOperandsAfterLower}m{ParseOperandsAfterLower}p{ParseOperandsAfterLower}c))]
+D[ParseOperandsAfterLower|l,t,i,e,m,p,c|l == i ? {Fail} ? (((i{ParseCore}l){ParseOperandStore}l{ParseOperandStore}t{ParseOperandStore}e{ParseOperandStore}m{ParseOperandStore}p{ParseOperandStore}c))]
+D[ParseOperandStore|n,l,t,e,m,p,c|((p+c){ArraySet}n)(((c+1) < m) ? (t{ParseOperands}(l+1){ParseOperands}e{ParseOperands}m{ParseOperands}p{ParseOperands}(c+1)) ? (t{ParseOperands}l{ParseOperands}e{ParseOperands}m{ParseOperands}p{ParseOperands}(c+1)))]
+
+D[ParseOneDefinition|i|
+  (L[tokenCount]S[defTokStart])
+  ((i{DefBodyStart}){LexRange}(i{DefBodyEnd}){LexRange}i)
+  (L[tokenCount]S[defTokEnd])
+  (i{SetDefTokenStart}L[defTokStart])
+  (i{SetDefTokenEnd}L[defTokEnd])
+  (i{SetDefBodyNode}{Missing})
+  ((L[defTokStart]{ParseCore}L[defTokEnd])S[defNode])
+  (i{SetDefBodyNode}L[defNode])]
+D[ParseAllDefs|i|i > L[defCount] ? 0 ? ((i{DefBodyNode} != 0) ? ((i+1){ParseAllDefs}) ? ((i{ParseOneDefinition})((i+1){ParseAllDefs})))]
+
+D[MarkTail|n,t,d|0]
+D[MarkList|p,c,t,d|0]
+
+D[MarkChildren|n,d|
+  (n{NodeType} == {NodeLoadArray}) ? ((n{NodeVal}){MarkTail}0{MarkTail}d) ?
+  ((n{NodeType} == {NodePrint}) ? ((n{NodeVal}){MarkTail}0{MarkTail}d) ?
+  ((n{NodeType} == {NodeDecimal}) ? ((n{NodeVal}){MarkTail}0{MarkTail}d) ?
+  ((n{NodeType} == {NodeStoreVar}) ? ((n{NodeVal}){MarkTail}0{MarkTail}d) ?
+  ((n{NodeType} == {NodeStoreArray}) ? (((n{NodeVal}){MarkTail}0{MarkTail}d)((n{NodeA}){MarkTail}0{MarkTail}d)) ?
+  ((n{NodeType} == {NodeBinary}) ? (((n{NodeVal}){MarkTail}0{MarkTail}d)((n{NodeA}){MarkTail}0{MarkTail}d)) ?
+  0)))))]
+D[MarkUser|n,t,d|((n{NodeA}){MarkList}(n{NodeB}){MarkList}0{MarkList}d)(t && ((n{NodeVal}) == d) ? (n{SetNodeC}1) ? 0)]
+D[MarkConditional|n,t,d|((n{NodeVal}){MarkTail}0{MarkTail}d)((n{NodeA}){MarkTail}t{MarkTail}d)((n{NodeB}){MarkTail}t{MarkTail}d)]
+D[MarkTail|n,t,d|
+  (n{NodeType} == {NodeParen}) ? ((n{NodeVal}){MarkList}(n{NodeA}){MarkList}t{MarkList}d) ?
+  ((n{NodeType} == {NodeConditional}) ? (n{MarkConditional}t{MarkConditional}d) ?
+  ((n{NodeType} == {NodeUser}) ? (n{MarkUser}t{MarkUser}d) ?
+  (n{MarkChildren}d)))]
+D[MarkList|p,c,t,d|c <= 0 ? 0 ? (((p{ArrayGet}){MarkTail}(c == 1 ? t ? 0){MarkTail}d)((p+1){MarkList}(c-1){MarkList}t{MarkList}d))]
+D[MarkAllDefsFrom|i|i > L[defCount] ? 0 ? (((i{DefBodyNode}){MarkTail}1{MarkTail}i)((i+1){MarkAllDefsFrom}))]
+D[MarkAllDefs||1{MarkAllDefsFrom}]
+
+D[Eval|n,f,d|0]
+D[EvalBody|d,f|0]
+D[EvalList|p,c,f,d,l|0]
+D[EvalUser|n,f,d|0]
+D[EvalUserOperands|p,c,a,i,f,d|0]
+
+D[Truth|x|x != 0 ? 1 ? 0]
+D[TargetAddr|i|{TargetMemoryOrigin}+i]
+D[EvalLoadArrayAfter|i|(i{TargetAddr})@]
+D[EvalPrintAfter|x|(xP)0]
+D[EvalDecimalAfter|x,n|x*10+(n{NodeA})]
+D[EvalStoreVarAfter|x,n|((n{NodeA}){SetVar}x)]
+D[EvalStoreArrayIndex|i,x|(x->(i{TargetAddr}))x]
+D[EvalStoreArrayValue|x,n,f,d|((n{NodeA}){Eval}f{Eval}d){EvalStoreArrayIndex}x]
+
+D[ApplyBinary|r,l,b|
+  (b == {BinAdd}) ? (l+r) ?
+  ((b == {BinSub}) ? (l-r) ?
+  ((b == {BinMult}) ? (l*r) ?
+  ((b == {BinDiv}) ? (r == 0 ? {Fail} ? (l/r)) ?
+  ((b == {BinMod}) ? (r == 0 ? {Fail} ? (l%r)) ?
+  ((b == {BinEq}) ? (l == r ? 1 ? 0) ?
+  ((b == {BinNe}) ? (l != r ? 1 ? 0) ?
+  ((b == {BinLt}) ? (l < r ? 1 ? 0) ?
+  ((b == {BinLe}) ? (l <= r ? 1 ? 0) ?
+  ((b == {BinGe}) ? (l >= r ? 1 ? 0) ?
+  ((b == {BinGt}) ? (l > r ? 1 ? 0) ?
+  {Fail})))))))))))]
+D[EvalBinaryRight|l,n,f,d|((n{NodeA}){Eval}f{Eval}d){ApplyBinary}l{ApplyBinary}(n{NodeB})]
+D[EvalBinary|n,f,d|
+  (n{NodeB} == {BinAnd}) ? (((n{NodeVal}){Eval}f{Eval}d) ? (((n{NodeA}){Eval}f{Eval}d){Truth}) ? 0) ?
+  ((n{NodeB} == {BinOr}) ? (((n{NodeVal}){Eval}f{Eval}d) ? 1 ? (((n{NodeA}){Eval}f{Eval}d){Truth})) ?
+  (((n{NodeVal}){Eval}f{Eval}d){EvalBinaryRight}n{EvalBinaryRight}f{EvalBinaryRight}d))]
+D[EvalConditional|n,f,d|((n{NodeVal}){Eval}f{Eval}d) ? ((n{NodeA}){Eval}f{Eval}d) ? ((n{NodeB}){Eval}f{Eval}d)]
+
+D[CopyArgsToFrame|a,f,i,c|i >= c ? 0 ? (((f{FrameArgs}+i){ArraySet}((a+i){ArrayGet})) (a{CopyArgsToFrame}f{CopyArgsToFrame}(i+1){CopyArgsToFrame}c))]
+D[EvalUserOperandStore|v,p,c,a,i,f,d|((a+i){ArraySet}v)(p{EvalUserOperands}c{EvalUserOperands}a{EvalUserOperands}(i+1){EvalUserOperands}f{EvalUserOperands}d)]
+D[EvalUserOperands|p,c,a,i,f,d|i >= c ? 0 ? ((((p+i){ArrayGet}){Eval}f{Eval}d){EvalUserOperandStore}p{EvalUserOperandStore}c{EvalUserOperandStore}a{EvalUserOperandStore}i{EvalUserOperandStore}f{EvalUserOperandStore}d)]
+D[RestoreRuntime|v,a,f|(aS[arrayNext])(fS[frameCount])v]
+D[EvalUserNormal|n,f,d,a,m,g|((n{NodeVal}){EvalBody}((n{NodeVal}){NewFrame}a{NewFrame}(n{NodeB}))){RestoreRuntime}m{RestoreRuntime}g]
+D[EvalUserAfterOperands|n,f,d,a,m|((n{NodeC}) && ((n{NodeVal}) == d)) ? ((a{CopyArgsToFrame}f{CopyArgsToFrame}0{CopyArgsToFrame}(n{NodeB}))(mS[arrayNext])(1S[tailSignal])0) ? (n{EvalUserNormal}f{EvalUserNormal}d{EvalUserNormal}a{EvalUserNormal}m{EvalUserNormal}L[frameCount])]
+D[EvalUserWithArgs|n,f,d,a,m|((n{NodeA}){EvalUserOperands}(n{NodeB}){EvalUserOperands}a{EvalUserOperands}0{EvalUserOperands}f{EvalUserOperands}d)(n{EvalUserAfterOperands}f{EvalUserAfterOperands}d{EvalUserAfterOperands}a{EvalUserAfterOperands}m)]
+D[EvalUserAlloc|m,n,f,d|n{EvalUserWithArgs}f{EvalUserWithArgs}d{EvalUserWithArgs}((n{NodeB}){AllocCells}){EvalUserWithArgs}m]
+D[EvalUser|n,f,d|L[arrayNext]{EvalUserAlloc}n{EvalUserAlloc}f{EvalUserAlloc}d]
+
+D[EvalList|p,c,f,d,l|L[tailSignal] ? l ? (c <= 0 ? l ? ((p+1){EvalList}(c-1){EvalList}f{EvalList}d{EvalList}((p{ArrayGet}){Eval}f{Eval}d)))]
+
+D[Eval|n,f,d|
+  (n{NodeType} == {NodeZero}) ? 0 ?
+  ((n{NodeType} == {NodeDefine}) ? 0 ?
+  ((n{NodeType} == {NodeArg}) ? ((f{FrameArgs}+n{NodeVal}){ArrayGet}) ?
+  ((n{NodeType} == {NodeLoadVar}) ? ((n{NodeVal}){GetVar}) ?
+  ((n{NodeType} == {NodeInput}) ? I ?
+  ((n{NodeType} == {NodeLoadArray}) ? (((n{NodeVal}){Eval}f{Eval}d){EvalLoadArrayAfter}) ?
+  ((n{NodeType} == {NodePrint}) ? (((n{NodeVal}){Eval}f{Eval}d){EvalPrintAfter}) ?
+  ((n{NodeType} == {NodeParen}) ? ((n{NodeVal}){EvalList}(n{NodeA}){EvalList}f{EvalList}d{EvalList}0) ?
+  ((n{NodeType} == {NodeDecimal}) ? (((n{NodeVal}){Eval}f{Eval}d){EvalDecimalAfter}n) ?
+  ((n{NodeType} == {NodeStoreVar}) ? (((n{NodeVal}){Eval}f{Eval}d){EvalStoreVarAfter}n) ?
+  ((n{NodeType} == {NodeStoreArray}) ? (((n{NodeVal}){Eval}f{Eval}d){EvalStoreArrayValue}n{EvalStoreArrayValue}f{EvalStoreArrayValue}d) ?
+  ((n{NodeType} == {NodeBinary}) ? (n{EvalBinary}f{EvalBinary}d) ?
+  ((n{NodeType} == {NodeConditional}) ? (n{EvalConditional}f{EvalConditional}d) ?
+  ((n{NodeType} == {NodeUser}) ? (n{EvalUser}f{EvalUser}d) ?
+  {Fail}))))))))))))))]
+D[EvalBodyAfter|v,d,f|L[tailSignal] ? ((0S[tailSignal])(d{EvalBody}f)) ? v]
+D[EvalBody|d,f|(0S[tailSignal])(((d{DefBodyNode}){Eval}f{Eval}d){EvalBodyAfter}d{EvalBodyAfter}f)]
+
+D[Init||
+  (0S[sourceLen])
+  (0S[nameCount])
+  (0S[defCount])
+  (0S[tokenCount])
+  (0S[nodeCount])
+  (0S[arrayNext])
+  (0S[frameCount])
+  (0S[varCount])
+  (0S[tailSignal])
+  ({NewNodeZero}S[zeroNode])]
+
+({Init})
+({ReadSource})
+(L[tokenCount]S[topTokenStart])
+(0{LexRange}L[sourceLen]{LexRange}0)
+(L[tokenCount]S[topTokenEnd])
+(1{ParseAllDefs})
+((L[topTokenStart]{ParseCore}L[topTokenEnd])S[mainNode])
+({MarkAllDefs})
+(L[mainNode]{Eval}0{Eval}0)

@@ -263,7 +263,12 @@ __pycache__/
 *.out
 *.o
 *.d
-calc4*
+calc4
+calc4.exe
+calc4-test
+calc4-test.exe
+calc4-codegen-test
+calc4-codegen-test.exe
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
