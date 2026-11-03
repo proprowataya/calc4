@@ -35,24 +35,6 @@ class ExecutionTest : public ::testing::TestWithParam<ExecutionTestCase>
 {
 };
 
-#ifdef ENABLE_INT128
-#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
-    do                                                                                             \
-    {                                                                                              \
-        if constexpr (std::is_same_v<TYPENAME, __int128_t>)                                        \
-        {                                                                                          \
-            ASSERT_TRUE(static_cast<__int128_t>(EXPECTED) == (ACTUAL));                            \
-        }                                                                                          \
-        else                                                                                       \
-        {                                                                                          \
-            ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL));                                  \
-        }                                                                                          \
-    } while (false)
-#else
-#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
-    ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL))
-#endif // ENABLE_INT128
-
 template<typename TNumber>
 void OperateOneExecutionTest(const ExecutionTestCase& test)
 {

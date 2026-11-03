@@ -15,6 +15,7 @@ FetchContent_MakeAvailable(googletest)
 # calc4-test
 # ---------------------------------------------------------------------
 add_executable(calc4-test
+    DefaultGlobalArraySourceTest.cpp
     ErrorTest.cpp
     ExecutionTest.cpp
     ExecutionTestCases.cpp
