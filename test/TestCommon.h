@@ -21,11 +21,31 @@
 #endif // ENABLE_JIT
 
 #include <cstdint>
+#include <gtest/gtest.h>
+#include <type_traits>
 #include <vector>
 
 #ifdef ENABLE_GMP
 #include <gmpxx.h>
 #endif // ENABLE_GMP
+
+#ifdef ENABLE_INT128
+#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
+    do                                                                                             \
+    {                                                                                              \
+        if constexpr (std::is_same_v<TYPENAME, __int128_t>)                                        \
+        {                                                                                          \
+            ASSERT_TRUE(static_cast<__int128_t>(EXPECTED) == (ACTUAL));                            \
+        }                                                                                          \
+        else                                                                                       \
+        {                                                                                          \
+            ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL));                                  \
+        }                                                                                          \
+    } while (false)
+#else
+#define ASSERT_EQ_HELPER(TYPENAME, EXPECTED, ACTUAL)                                               \
+    ASSERT_EQ(static_cast<TYPENAME>(EXPECTED), (ACTUAL))
+#endif // ENABLE_INT128
 
 namespace
 {
